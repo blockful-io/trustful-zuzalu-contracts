@@ -7,6 +7,14 @@ import { Attestation } from "../Common.sol";
 /// @title ISchemaResolver
 /// @notice The interface of an optional schema resolver.
 interface ISchemaResolver {
+  /// @notice Actions that can be performed by the resolver.
+  enum Action {
+    ASSIGN_MANAGER,
+    ASSIGN_VILLAGER,
+    ATTEST,
+    REPLY
+  }
+
   /// @notice Checks if the resolver can be sent ETH.
   /// @return Whether the resolver supports ETH transfers.
   function isPayable() external pure returns (bool);
