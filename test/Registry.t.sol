@@ -18,7 +18,7 @@ contract RegistryTest is Test {
   }
 
   function test_registry_manager() public {
-    string memory schema = "string name, uint256 id";
+    string memory schema = "";
     bool revocable = true;
 
     bytes32 uid = schemaRegistry.register(schema, resolver, revocable);
@@ -27,7 +27,7 @@ contract RegistryTest is Test {
   }
 
     function test_registry_villager() public {
-    string memory schema = "string name, uint256 villageId";
+    string memory schema = "";
     bool revocable = false;
 
     bytes32 uid = schemaRegistry.register(schema, resolver, revocable);
@@ -36,7 +36,7 @@ contract RegistryTest is Test {
   }
 
     function test_registry_badge() public {
-    string memory schema = "string badgeName, uint256 badgeId";
+    string memory schema = "string title, string memory comment";
     bool revocable = false;
 
     bytes32 uid = schemaRegistry.register(schema, resolver, revocable);
@@ -46,7 +46,7 @@ contract RegistryTest is Test {
   }
 
   function test_registry_response_badge() public {
-    string memory schema = "bool eventStatus";
+    string memory schema = "bool status";
     bool revocable = true;
 
     bytes32 uid = schemaRegistry.register(schema, resolver, revocable);
