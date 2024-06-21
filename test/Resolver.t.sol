@@ -2,7 +2,6 @@
 pragma solidity ^0.8.13;
 
 import { Test, console2 } from "forge-std/src/Test.sol";
-import { Counter } from "../src/Counter.sol";
 
 contract ResolverTest is Test {
   uint256 a;
@@ -11,7 +10,7 @@ contract ResolverTest is Test {
     a = 5;
   }
 
-  function test() public {
+  function test_log() public view {
     console2.log("a", a);
   }
 }
