@@ -36,7 +36,7 @@ contract RegistryTest is Test {
   }
 
     function test_registry_badge() public {
-    string memory schema = "string title, string memory comment";
+    string memory schema = "string title, string comment";
     bool revocable = false;
 
     bytes32 uid = schemaRegistry.register(schema, resolver, revocable);
