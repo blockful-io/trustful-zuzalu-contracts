@@ -5,7 +5,6 @@ pragma solidity ^0.8.4;
 import { IEAS, Attestation } from "../IEAS.sol";
 import { AccessDenied, InvalidEAS, InvalidLength, uncheckedInc } from "../Common.sol";
 import { Semver } from "../Semver.sol";
-
 import { ISchemaResolver } from "./ISchemaResolver.sol";
 
 /// @title SchemaResolver
@@ -13,9 +12,18 @@ import { ISchemaResolver } from "./ISchemaResolver.sol";
 abstract contract SchemaResolver is ISchemaResolver, Semver {
     error InsufficientValue();
     error NotPayable();
+    error Unauthorized();
 
     // The global EAS contract.
     IEAS internal immutable _eas;
+
+    // Roles
+    bytes32 public constant ROOT_ROLE = keccak256("ROOT_ROLE");
+    bytes32 public constant MANAGER_ROLE = keccak256("MANAGER_ROLE");
+    bytes32 public constant VILLAGER_ROLE = keccak256("VILLAGER_ROLE");
+
+    // Allowlist mapping
+    mapping(address => bytes32) public roles;
 
     /// @dev Creates a new resolver.
     /// @param eas The address of the global EAS contract.
@@ -25,12 +33,22 @@ abstract contract SchemaResolver is ISchemaResolver, Semver {
         }
 
         _eas = eas;
+
+        // Assign ROOT_ROLE to the deployer
+        roles[msg.sender] = ROOT_ROLE;
     }
 
     /// @dev Ensures that only the EAS contract can make this call.
     modifier onlyEAS() {
         _onlyEAS();
+        _;
+    }
 
+    /// @dev Ensures that the caller has the specified role.
+    modifier onlyRole(bytes32 role) {
+        if (roles[msg.sender] != role) {
+            revert Unauthorized();
+        }
         _;
     }
 
@@ -48,7 +66,16 @@ abstract contract SchemaResolver is ISchemaResolver, Semver {
 
     /// @inheritdoc ISchemaResolver
     function attest(Attestation calldata attestation) external payable onlyEAS returns (bool) {
-        return onAttest(attestation, msg.value);
+        // Verify permissions
+        if (roles[attestation.attester] == MANAGER_ROLE && roles[attestation.recipient] == VILLAGER_ROLE) {
+            return onAttest(attestation, msg.value);
+        } else if (roles[attestation.attester] == ROOT_ROLE && roles[attestation.recipient] == MANAGER_ROLE) {
+            return onAttest(attestation, msg.value);
+        } else if (roles[attestation.attester] == ROOT_ROLE) {
+            return onAttest(attestation, msg.value);
+        } else {
+            revert Unauthorized();
+        }
     }
 
     /// @inheritdoc ISchemaResolver
@@ -61,26 +88,19 @@ abstract contract SchemaResolver is ISchemaResolver, Semver {
             revert InvalidLength();
         }
 
-        // We are keeping track of the remaining ETH amount that can be sent to resolvers and will keep deducting
-        // from it to verify that there isn't any attempt to send too much ETH to resolvers. Please note that unless
-        // some ETH was stuck in the contract by accident (which shouldn't happen in normal conditions), it won't be
-        // possible to send too much ETH anyway.
         uint256 remainingValue = msg.value;
 
         for (uint256 i = 0; i < length; i = uncheckedInc(i)) {
-            // Ensure that the attester/revoker doesn't try to spend more than available.
             uint256 value = values[i];
             if (value > remainingValue) {
                 revert InsufficientValue();
             }
 
-            // Forward the attestation to the underlying resolver and return false in case it isn't approved.
-            if (!onAttest(attestations[i], value)) {
+            if (!attest(attestations[i])) {
                 return false;
             }
 
             unchecked {
-                // Subtract the ETH amount, that was provided to this attestation, from the global remaining ETH amount.
                 remainingValue -= value;
             }
         }
@@ -103,26 +123,19 @@ abstract contract SchemaResolver is ISchemaResolver, Semver {
             revert InvalidLength();
         }
 
-        // We are keeping track of the remaining ETH amount that can be sent to resolvers and will keep deducting
-        // from it to verify that there isn't any attempt to send too much ETH to resolvers. Please note that unless
-        // some ETH was stuck in the contract by accident (which shouldn't happen in normal conditions), it won't be
-        // possible to send too much ETH anyway.
         uint256 remainingValue = msg.value;
 
         for (uint256 i = 0; i < length; i = uncheckedInc(i)) {
-            // Ensure that the attester/revoker doesn't try to spend more than available.
             uint256 value = values[i];
             if (value > remainingValue) {
                 revert InsufficientValue();
             }
 
-            // Forward the revocation to the underlying resolver and return false in case it isn't approved.
-            if (!onRevoke(attestations[i], value)) {
+            if (!revoke(attestations[i])) {
                 return false;
             }
 
             unchecked {
-                // Subtract the ETH amount, that was provided to this attestation, from the global remaining ETH amount.
                 remainingValue -= value;
             }
         }
@@ -132,19 +145,13 @@ abstract contract SchemaResolver is ISchemaResolver, Semver {
 
     /// @notice A resolver callback that should be implemented by child contracts.
     /// @param attestation The new attestation.
-    /// @param value An explicit ETH amount that was sent to the resolver. Please note that this value is verified in
-    ///     both attest() and multiAttest() callbacks EAS-only callbacks and that in case of multi attestations, it'll
-    ///     usually hold that msg.value != value, since msg.value aggregated the sent ETH amounts for all the
-    ///     attestations in the batch.
+    /// @param value An explicit ETH amount that was sent to the resolver.
     /// @return Whether the attestation is valid.
     function onAttest(Attestation calldata attestation, uint256 value) internal virtual returns (bool);
 
     /// @notice Processes an attestation revocation and verifies if it can be revoked.
     /// @param attestation The existing attestation to be revoked.
-    /// @param value An explicit ETH amount that was sent to the resolver. Please note that this value is verified in
-    ///     both revoke() and multiRevoke() callbacks EAS-only callbacks and that in case of multi attestations, it'll
-    ///     usually hold that msg.value != value, since msg.value aggregated the sent ETH amounts for all the
-    ///     attestations in the batch.
+    /// @param value An explicit ETH amount that was sent to the resolver.
     /// @return Whether the attestation can be revoked.
     function onRevoke(Attestation calldata attestation, uint256 value) internal virtual returns (bool);
 
@@ -153,5 +160,12 @@ abstract contract SchemaResolver is ISchemaResolver, Semver {
         if (msg.sender != address(_eas)) {
             revert AccessDenied();
         }
+    }
+
+    /// @notice Assigns a role to an address.
+    /// @param account The address to assign the role to.
+    /// @param role The role to assign.
+    function assignRole(address account, bytes32 role) external onlyRole(ROOT_ROLE) {
+        roles[account] = role;
     }
 }
