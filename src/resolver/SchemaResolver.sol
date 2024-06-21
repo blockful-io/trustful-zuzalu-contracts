@@ -113,7 +113,7 @@ abstract contract SchemaResolver is ISchemaResolver, Semver {
       }
 
       // Forward the attestation to the underlying resolver and return false in case it isn't approved.
-      if (!onAttest(attestations[i])) {
+      if (!onAttest(attestations[i], value)) {
         return false;
       }
 
