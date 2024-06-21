@@ -13,6 +13,7 @@ contract RegistryTest is Test {
   ISchemaResolver resolver;
 
   function setUp() public {
+    vm.startPrank(0xF977814e90dA44bFA03b6295A0616a897441aceC);
     resolver = new Resolver(eas);
   }
 
@@ -21,5 +22,7 @@ contract RegistryTest is Test {
     bool revocable = true;
 
     bytes32 uid = schemaRegistry.register(schema, resolver, revocable);
+    console2.log("Schema UID generated:");
+    console2.logBytes32(uid);
   }
 }
