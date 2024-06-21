@@ -22,7 +22,39 @@ contract RegistryTest is Test {
     bool revocable = true;
 
     bytes32 uid = schemaRegistry.register(schema, resolver, revocable);
-    console2.log("Schema UID generated:");
+    console2.log("Schema UID generated Manager:");
     console2.logBytes32(uid);
   }
+
+    function test_registry_villager() public {
+    string memory schema = "";
+    bool revocable = false;
+
+    bytes32 uid = schemaRegistry.register(schema, resolver, revocable);
+    console2.log("Schema UID generated Villager:");
+    console2.logBytes32(uid);
+  }
+
+    function test_registry_badge() public {
+    string memory schema = "string title, string comment";
+    bool revocable = false;
+
+    bytes32 uid = schemaRegistry.register(schema, resolver, revocable);
+    
+    console2.log("Schema UID generated Badge:");
+    console2.logBytes32(uid);
+  }
+
+  function test_registry_response_badge() public {
+    string memory schema = "bool status";
+    bool revocable = true;
+
+    bytes32 uid = schemaRegistry.register(schema, resolver, revocable);
+    
+    console2.log("Schema UID generated Response Badge:");
+    console2.logBytes32(uid);
+  }
+
 }
+
+
