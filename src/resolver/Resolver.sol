@@ -3,20 +3,21 @@
 pragma solidity ^0.8.4;
 
 import { IEAS, Attestation } from "../interfaces/IEAS.sol";
-import { AccessDenied, InvalidEAS, InvalidLength, uncheckedInc, EMPTY_UID } from "../Common.sol";
 import { ISchemaResolver } from "../interfaces/ISchemaResolver.sol";
+import { AccessDenied, InvalidEAS, InvalidLength, uncheckedInc, EMPTY_UID } from "../Common.sol";
+import { AccessControl } from "@openzeppelin/contracts/access/AccessControl.sol";
+
+error InsufficientValue();
+error NotPayable();
+error Unauthorized();
+error ManagerRoleMustBeRevocable();
+error BadgeNotFound();
+error InvalidRefUID();
 
 /// @title Resolver
 /// @author Blockful
 /// @notice The base schema resolver contract.
-contract Resolver is ISchemaResolver {
-  error InsufficientValue();
-  error NotPayable();
-  error Unauthorized();
-  error ManagerRoleMustBeRevocable();
-  error BadgeNotFound();
-  error InvalidRefUID();
-
+contract Resolver is ISchemaResolver, AccessControl {
   // The global EAS contract.
   IEAS internal immutable _eas;
 
@@ -25,62 +26,60 @@ contract Resolver is ISchemaResolver {
   bytes32 public constant MANAGER_ROLE = keccak256("MANAGER_ROLE");
   bytes32 public constant VILLAGER_ROLE = keccak256("VILLAGER_ROLE");
 
-  // Allowlists
-  mapping(address => bytes32) private _roles;
-
-  // Allowed Schemas
+  // Schemas to Role ID
   mapping(bytes32 => bytes32) private _schemas;
 
-  // Allowed Badges (Attestation titles to be emitted)
+  // Allowed Badges (Hashed titles that can be attested)
   mapping(bytes32 => bool) private _badges;
 
   /// @dev Creates a new resolver.
   /// @param eas The address of the global EAS contract.
   constructor(IEAS eas) {
-    if (address(eas) == address(0)) {
-      revert InvalidEAS();
-    }
-
+    if (address(eas) == address(0)) revert InvalidEAS();
     _eas = eas;
 
     // Assigns ROOT_ROLE to the deployer
-    _roles[msg.sender] = ROOT_ROLE;
+    _grantRole(ROOT_ROLE, msg.sender);
+    // Assigns ROOT_ROLE as the admin of all roles
+    _setRoleAdmin(ROOT_ROLE, ROOT_ROLE);
+    _setRoleAdmin(MANAGER_ROLE, ROOT_ROLE);
+    _setRoleAdmin(VILLAGER_ROLE, ROOT_ROLE);
   }
 
   /// @dev Ensures that only the EAS contract can make this call.
   modifier onlyEAS() {
-    _onlyEAS();
+    if (msg.sender != address(_eas)) revert AccessDenied();
     _;
   }
 
   /// @inheritdoc ISchemaResolver
   function attest(Attestation calldata attestation) external payable onlyEAS returns (bool) {
-    bytes32 role = _schemas[attestation.schema];
+    bytes32 roleId = _schemas[attestation.schema];
 
     // Schema to create managers
-    if (role == ROOT_ROLE) {
+    if (roleId == ROOT_ROLE) {
       if (!attestation.revocable) revert ManagerRoleMustBeRevocable();
-      _grantRole(attestation.recipient, MANAGER_ROLE);
+      _grantRole(MANAGER_ROLE, attestation.recipient);
       return true;
     }
 
     // Schema to create villagers ( checkIn / checkOut )
-    if (role == MANAGER_ROLE) {
+    if (roleId == MANAGER_ROLE) {
       bool isCheckedIn = abi.decode(attestation.data, (bool));
-      if (!isCheckedIn) _grantRole(attestation.recipient, VILLAGER_ROLE);
-      if (isCheckedIn) _revokeRole(attestation.recipient);
+      if (!isCheckedIn) _grantRole(VILLAGER_ROLE, attestation.recipient);
+      if (isCheckedIn) _revokeRole(VILLAGER_ROLE, attestation.recipient);
       return true;
     }
 
     // Schema to create event badges
-    if (role == VILLAGER_ROLE || role == MANAGER_ROLE) {
+    if (roleId == VILLAGER_ROLE || roleId == MANAGER_ROLE) {
       (string memory title, ) = abi.decode(attestation.data, (string, string));
       if (!_badges[keccak256(abi.encode(title))]) revert BadgeNotFound();
       return true;
     }
 
     // Schema to create a response ( true / false )
-    if (role == VILLAGER_ROLE || role == MANAGER_ROLE) {
+    if (roleId == VILLAGER_ROLE || roleId == MANAGER_ROLE) {
       if (attestation.refUID != EMPTY_UID) revert InvalidRefUID();
       return true;
     }
@@ -90,15 +89,15 @@ contract Resolver is ISchemaResolver {
 
   /// @inheritdoc ISchemaResolver
   function revoke(Attestation calldata attestation) external payable onlyEAS returns (bool) {
+    bytes32 role = _schemas[attestation.schema];
+
+    // Schema to revoke managers
+    if (role == ROOT_ROLE) {
+      _revokeRole(MANAGER_ROLE, attestation.recipient);
+      return true;
+    }
+
     return false;
-  }
-
-  function _grantRole(address account, bytes32 role) internal {
-    _roles[account] = role;
-  }
-
-  function _revokeRole(address account) internal {
-    _roles[account] = 0x0;
   }
 
   function addSchema(bytes32 uid, bytes32 role) public {
@@ -115,18 +114,6 @@ contract Resolver is ISchemaResolver {
 
   function revokeBadge(string memory title) public {
     _badges[keccak256(abi.encode(title))] = false;
-  }
-
-  /// @dev Returns `true` if `account` has been granted `role`.
-  function hasRole(address account, bytes32 role) public view virtual returns (bool) {
-    return _roles[account] == role;
-  }
-
-  /// @dev Ensures that only the EAS contract can make this call.
-  function _onlyEAS() private view {
-    if (msg.sender != address(_eas)) {
-      revert AccessDenied();
-    }
   }
 
   /// @inheritdoc ISchemaResolver
