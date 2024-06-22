@@ -3,22 +3,23 @@
 pragma solidity ^0.8.4;
 
 import { IEAS, Attestation } from "../interfaces/IEAS.sol";
-import { ISchemaResolver } from "../interfaces/ISchemaResolver.sol";
-import { AccessDenied, InvalidEAS, InvalidLength, uncheckedInc, EMPTY_UID } from "../Common.sol";
+import { IResolver } from "../interfaces/IResolver.sol";
+import { AccessDenied, InvalidEAS, InvalidLength, uncheckedInc, EMPTY_UID, NO_EXPIRATION_TIME } from "../Common.sol";
 import { AccessControl } from "@openzeppelin/contracts/access/AccessControl.sol";
 
 error InsufficientValue();
 error NotPayable();
 error Unauthorized();
-error ManagerRoleMustBeRevocable();
-error AttestationTitleNotFound();
-error InvalidRefUID();
 error AlreadyCheckedOut();
+error InvalidAttestationTitle();
+error InvalidRefUID();
+error InvalidExpiration();
+error InvalidRevocability();
 
 /// @title Resolver
-/// @author Blockful
-/// @notice The base schema resolver contract.
-contract Resolver is ISchemaResolver, AccessControl {
+/// @author Blockful | 0xneves
+/// @notice ZuVillage Resolver contract.
+contract Resolver is IResolver, AccessControl {
   // The global EAS contract.
   IEAS internal immutable _eas;
 
@@ -31,7 +32,7 @@ contract Resolver is ISchemaResolver, AccessControl {
   mapping(address => bool) private _checkedOutVillagers;
 
   // Schemas ID to role ID to action
-  mapping(bytes32 => mapping(bytes32 => Action)) private _schemas;
+  mapping(bytes32 => mapping(bytes32 => Action)) private _allowedSchemas;
 
   // Allowed Attestations (Hashed titles that can be attested)
   mapping(bytes32 => bool) private _allowedAttestationTitles;
@@ -56,25 +57,42 @@ contract Resolver is ISchemaResolver, AccessControl {
     _;
   }
 
-  /// @inheritdoc ISchemaResolver
+  /// @inheritdoc IResolver
   function isPayable() public pure virtual returns (bool) {
     return false;
   }
 
-  /// @inheritdoc ISchemaResolver
-  function attest(Attestation calldata attestation) external payable onlyEAS returns (bool) {
-    // Schema to assign managers
-    if (_schemas[attestation.schema][ROOT_ROLE] == Action.ASSIGN_MANAGER) {
-      if (!attestation.revocable) revert ManagerRoleMustBeRevocable();
+  /// @inheritdoc IResolver
+  function checkedOutVillagers(address villager) public view returns (bool) {
+    return _checkedOutVillagers[villager];
+  }
 
+  /// @inheritdoc IResolver
+  function schemas(bytes32 uid, bytes32 roleId) public view returns (Action) {
+    return _allowedSchemas[uid][roleId];
+  }
+
+  /// @inheritdoc IResolver
+  function allowedAttestationTitles(string memory title) public view returns (bool) {
+    return _allowedAttestationTitles[keccak256(abi.encode(title))];
+  }
+
+  /// @inheritdoc IResolver
+  function attest(Attestation calldata attestation) external payable onlyEAS returns (bool) {
+    // Prohibits the attestation expiration to be finite
+    if (attestation.expirationTime != NO_EXPIRATION_TIME) revert InvalidExpiration();
+
+    // Schema to assign managers
+    if (_allowedSchemas[attestation.schema][ROOT_ROLE] == Action.ASSIGN_MANAGER) {
+      if (!attestation.revocable) revert InvalidRevocability();
       _checkRole(ROOT_ROLE, attestation.attester);
       _grantRole(MANAGER_ROLE, attestation.recipient);
-
       return true;
     }
 
     // Schema to assign villagers ( checkIn / checkOut )
-    if (_schemas[attestation.schema][MANAGER_ROLE] == Action.ASSIGN_VILLAGER) {
+    if (_allowedSchemas[attestation.schema][MANAGER_ROLE] == Action.ASSIGN_VILLAGER) {
+      if (attestation.revocable) revert InvalidRevocability();
       _checkRole(MANAGER_ROLE, attestation.attester);
 
       // Check in if doesn't have Villager Role and is not checked out
@@ -92,31 +110,27 @@ contract Resolver is ISchemaResolver, AccessControl {
     }
 
     // Schema to create event attestations (Attestations)
-    if (
-      _schemas[attestation.schema][VILLAGER_ROLE] == Action.ATTEST ||
-      _schemas[attestation.schema][MANAGER_ROLE] == Action.ATTEST
-    ) {
-      if (!hasRole(VILLAGER_ROLE, attestation.attester) && !hasRole(MANAGER_ROLE, attestation.attester)) {
-        revert AccessControlBadConfirmation();
-      }
+    if (_allowedSchemas[attestation.schema][VILLAGER_ROLE] == Action.ATTEST) {
+      if (!attestation.revocable) revert InvalidRevocability();
+      _checkRole(VILLAGER_ROLE, attestation.attester);
 
+      // Titles for attestations must be included by the managers
       (string memory title, ) = abi.decode(attestation.data, (string, string));
-      if (!_allowedAttestationTitles[keccak256(abi.encode(title))]) revert AttestationTitleNotFound();
+      if (!_allowedAttestationTitles[keccak256(abi.encode(title))]) revert InvalidAttestationTitle();
 
       return true;
     }
 
     // Schema to create a response ( true / false )
-    if (
-      _schemas[attestation.schema][VILLAGER_ROLE] == Action.REPLY ||
-      _schemas[attestation.schema][MANAGER_ROLE] == Action.REPLY
-    ) {
-      if (!hasRole(VILLAGER_ROLE, attestation.attester) && !hasRole(MANAGER_ROLE, attestation.attester)) {
-        revert AccessControlBadConfirmation();
-      }
+    if (_allowedSchemas[attestation.schema][VILLAGER_ROLE] == Action.REPLY) {
+      if (!attestation.revocable) revert InvalidRevocability();
+      _checkRole(VILLAGER_ROLE, attestation.attester);
 
+      // Checks if the attestation has a non empty reference
       if (attestation.refUID != EMPTY_UID) revert InvalidRefUID();
       Attestation memory attesterRef = _eas.getAttestation(attestation.refUID);
+      // Match the attester of this attestation with the recipient of the reference attestation
+      // The response is designed to be a reply to a previous attestation
       if (attesterRef.recipient != attestation.attester) revert InvalidRefUID();
 
       return true;
@@ -124,10 +138,10 @@ contract Resolver is ISchemaResolver, AccessControl {
     return false;
   }
 
-  /// @inheritdoc ISchemaResolver
+  /// @inheritdoc IResolver
   function revoke(Attestation calldata attestation) external payable onlyEAS returns (bool) {
     // Schema to revoke managers
-    if (_schemas[attestation.schema][ROOT_ROLE] == Action.ASSIGN_MANAGER) {
+    if (_allowedSchemas[attestation.schema][ROOT_ROLE] == Action.ASSIGN_MANAGER) {
       _checkRole(ROOT_ROLE, attestation.attester);
       _checkRole(MANAGER_ROLE, attestation.recipient);
       _revokeRole(MANAGER_ROLE, attestation.recipient);
@@ -137,22 +151,13 @@ contract Resolver is ISchemaResolver, AccessControl {
     return false;
   }
 
-  /// @dev Sets the role ID that can attest using a schema.
-  /// The schema determines the data layout for the attestation, while the attestation
-  /// determines the data that will fill the schema. When hooking the resolver from the
-  /// EAS contract, the attester should hodl the right role to attest with the schema.
-  /// @param uid The UID of the schema.
-  /// @param roleId The role ID that are allowed to attest using the schema.
-  function setSchema(bytes32 uid, bytes32 roleId, uint256 action) public {
-    _schemas[uid][roleId] = Action(action);
+  /// @inheritdoc IResolver
+  function setSchema(bytes32 uid, bytes32 roleId, uint256 action) public onlyRole(ROOT_ROLE) {
+    _allowedSchemas[uid][roleId] = Action(action);
   }
 
-  /// @dev Sets the attestation for a given title that will be attested.
-  /// When creating attestions, the title must match to the desired configuration saved
-  /// on the resolver.
-  /// @param title The title of the attestation.
-  /// @param isValid Whether the title for the attestation is valid or not. Defaults to false.
-  function setAttestationTitle(string memory title, bool isValid) public {
+  /// @inheritdoc IResolver
+  function setAttestationTitle(string memory title, bool isValid) public onlyRole(ROOT_ROLE) {
     _allowedAttestationTitles[keccak256(abi.encode(title))] = isValid;
   }
 

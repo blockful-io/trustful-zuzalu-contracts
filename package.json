@@ -32,6 +32,7 @@
     "prettier:write": "prettier --write \"**/*.{json,md,yml}\" --ignore-path \".prettierignore\"",
     "test": "forge test",
     "test:registry": "forge test --match-test registry --fork-url https://mainnet.optimism.io -vvv --via-ir",
+    "test:resolver": "forge test --match-test access_control --fork-url https://mainnet.optimism.io -vvv --via-ir",
     "test:coverage": "forge coverage",
     "test:coverage:report": "forge coverage --report lcov && genhtml lcov.info --branch-coverage --output-dir coverage"
   }

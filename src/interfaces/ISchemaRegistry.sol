@@ -4,12 +4,12 @@ pragma solidity ^0.8.0;
 
 import { ISemver } from "./ISemver.sol";
 
-import { ISchemaResolver } from "./ISchemaResolver.sol";
+import { IResolver } from "./IResolver.sol";
 
 /// @notice A struct representing a record for a submitted schema.
 struct SchemaRecord {
   bytes32 uid; // The unique identifier of the schema.
-  ISchemaResolver resolver; // Optional schema resolver.
+  IResolver resolver; // Optional schema resolver.
   bool revocable; // Whether the schema allows revocations explicitly.
   string schema; // Custom specification of the schema (e.g., an ABI).
 }
@@ -28,7 +28,7 @@ interface ISchemaRegistry is ISemver {
   /// @param resolver An optional schema resolver.
   /// @param revocable Whether the schema allows revocations explicitly.
   /// @return The UID of the new schema.
-  function register(string calldata schema, ISchemaResolver resolver, bool revocable) external returns (bytes32);
+  function register(string calldata schema, IResolver resolver, bool revocable) external returns (bytes32);
 
   /// @notice Returns an existing schema by UID
   /// @param uid The UID of the schema to retrieve.
