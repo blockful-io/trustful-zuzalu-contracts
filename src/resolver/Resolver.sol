@@ -111,7 +111,7 @@ contract Resolver is IResolver, AccessControl {
 
     // Schema to create event attestations (Attestations)
     if (_allowedSchemas[attestation.schema][VILLAGER_ROLE] == Action.ATTEST) {
-      if (!attestation.revocable) revert InvalidRevocability();
+      if (attestation.revocable) revert InvalidRevocability();
       _checkRole(VILLAGER_ROLE, attestation.attester);
 
       // Titles for attestations must be included by the managers
@@ -127,7 +127,7 @@ contract Resolver is IResolver, AccessControl {
       _checkRole(VILLAGER_ROLE, attestation.attester);
 
       // Checks if the attestation has a non empty reference
-      if (attestation.refUID != EMPTY_UID) revert InvalidRefUID();
+      if (attestation.refUID == EMPTY_UID) revert InvalidRefUID();
       Attestation memory attesterRef = _eas.getAttestation(attestation.refUID);
       // Match the attester of this attestation with the recipient of the reference attestation
       // The response is designed to be a reply to a previous attestation
