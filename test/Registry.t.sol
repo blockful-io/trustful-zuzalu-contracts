@@ -3,14 +3,14 @@ pragma solidity ^0.8.13;
 
 import { Test, console2 } from "forge-std/src/Test.sol";
 import { Resolver } from "../src/resolver/Resolver.sol";
-import { ISchemaResolver } from "../src/interfaces/ISchemaResolver.sol";
+import { IResolver } from "../src/interfaces/IResolver.sol";
 import { ISchemaRegistry } from "../src/interfaces/ISchemaRegistry.sol";
 import { IEAS } from "../src/interfaces/IEAS.sol";
 
 contract RegistryTest is Test {
   IEAS eas = IEAS(0x4200000000000000000000000000000000000021);
   ISchemaRegistry schemaRegistry = ISchemaRegistry(0x4200000000000000000000000000000000000020);
-  ISchemaResolver resolver;
+  IResolver resolver;
 
   function setUp() public {
     vm.startPrank(0xF977814e90dA44bFA03b6295A0616a897441aceC);
@@ -26,7 +26,7 @@ contract RegistryTest is Test {
     console2.logBytes32(uid);
   }
 
-    function test_registry_villager() public {
+  function test_registry_villager() public {
     string memory schema = "";
     bool revocable = false;
 
@@ -35,26 +35,23 @@ contract RegistryTest is Test {
     console2.logBytes32(uid);
   }
 
-    function test_registry_badge() public {
+  function test_registry_attest() public {
     string memory schema = "string title, string comment";
     bool revocable = false;
 
     bytes32 uid = schemaRegistry.register(schema, resolver, revocable);
-    
-    console2.log("Schema UID generated Badge:");
+
+    console2.log("Schema UID generated attest:");
     console2.logBytes32(uid);
   }
 
-  function test_registry_response_badge() public {
+  function test_registry_response_attest() public {
     string memory schema = "bool status";
     bool revocable = true;
 
     bytes32 uid = schemaRegistry.register(schema, resolver, revocable);
-    
-    console2.log("Schema UID generated Response Badge:");
+
+    console2.log("Schema UID generated Response attest:");
     console2.logBytes32(uid);
   }
-
 }
-
-
