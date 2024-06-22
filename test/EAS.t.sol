@@ -5,7 +5,7 @@ import { Test, console2 } from "forge-std/src/Test.sol";
 import { Resolver } from "../src/resolver/Resolver.sol";
 import { IResolver } from "../src/interfaces/IResolver.sol";
 import { ISchemaRegistry } from "../src/interfaces/ISchemaRegistry.sol";
-import { IEAS, AttestationRequest, AttestationRequestData } from "../src/interfaces/IEAS.sol";
+import { IEAS, AttestationRequest, AttestationRequestData, RevocationRequest, RevocationRequestData } from "../src/interfaces/IEAS.sol";
 import { IAccessControl } from "@openzeppelin/contracts/access/IAccessControl.sol";
 
 contract ResolverTest is Test {
@@ -33,17 +33,31 @@ contract ResolverTest is Test {
     bytes32[] memory uids = register_allowed_schemas();
     string[] memory titles = register_allowed_titles();
 
-    attest_manager(uids[0], manager);
+    // Assign manager
+    bytes32 assignedManagerUID = attest_manager(uids[0], manager);
 
+    // Check-In Villagers
     vm.startPrank(manager);
     attest_villager(uids[1], villager);
     attest_villager(uids[1], manager); // assigns himself as a villager as well (checkIn)
+    assert(IAccessControl(address(resolver)).hasRole(VILLAGER_ROLE, villager));
+    assert(IAccessControl(address(resolver)).hasRole(VILLAGER_ROLE, manager));
 
+    // Attest Event
     vm.startPrank(villager);
-    bytes32 uid = attest_event(uids[2], manager, titles[0], "This address changed my mind");
+    bytes32 eventUID = attest_event(uids[2], manager, titles[0], "This address changed my mind");
 
+    // Attest Responses, then revoke it
     vm.startPrank(manager);
-    attest_response(uids[3], villager, uid, true);
+    bytes32 responseUID = attest_response(uids[3], villager, eventUID, true);
+    attest_response_revoke(uids[3], responseUID);
+
+    // Check-Out Villagers
+
+    // Revoke Manager
+    vm.startPrank(deployer);
+    attest_manager_revoke(uids[0], assignedManagerUID);
+    assert(!IAccessControl(address(resolver)).hasRole(MANAGER_ROLE, manager));
   }
 
   function register_allowed_schemas() public returns (bytes32[] memory) {
@@ -89,11 +103,11 @@ contract ResolverTest is Test {
     return titles;
   }
 
-  function attest_manager(bytes32 uid, address recipient) public returns (bytes32) {
+  function attest_manager(bytes32 schemaUID, address recipient) public returns (bytes32) {
     return
       eas.attest(
         AttestationRequest({
-          schema: uid,
+          schema: schemaUID,
           data: AttestationRequestData({
             recipient: recipient,
             expirationTime: 0,
@@ -106,11 +120,11 @@ contract ResolverTest is Test {
       );
   }
 
-  function attest_villager(bytes32 uid, address recipient) public returns (bytes32) {
+  function attest_villager(bytes32 schemaUID, address recipient) public returns (bytes32) {
     return
       eas.attest(
         AttestationRequest({
-          schema: uid,
+          schema: schemaUID,
           data: AttestationRequestData({
             recipient: recipient,
             expirationTime: 0,
@@ -124,7 +138,7 @@ contract ResolverTest is Test {
   }
 
   function attest_event(
-    bytes32 uid,
+    bytes32 schemaUID,
     address recipient,
     string memory title,
     string memory comment
@@ -132,7 +146,7 @@ contract ResolverTest is Test {
     return
       eas.attest(
         AttestationRequest({
-          schema: uid,
+          schema: schemaUID,
           data: AttestationRequestData({
             recipient: recipient,
             expirationTime: 0,
@@ -145,11 +159,16 @@ contract ResolverTest is Test {
       );
   }
 
-  function attest_response(bytes32 uid, address recipient, bytes32 refUID, bool status) public returns (bytes32) {
+  function attest_response(
+    bytes32 schemaUID,
+    address recipient,
+    bytes32 refUID,
+    bool status
+  ) public returns (bytes32) {
     return
       eas.attest(
         AttestationRequest({
-          schema: uid,
+          schema: schemaUID,
           data: AttestationRequestData({
             recipient: recipient,
             expirationTime: 0,
@@ -160,5 +179,23 @@ contract ResolverTest is Test {
           })
         })
       );
+  }
+
+  function attest_response_revoke(bytes32 schemaUID, bytes32 attestationUID) public {
+    eas.revoke(
+      RevocationRequest({
+        schema: schemaUID,
+        data: RevocationRequestData({ uid: attestationUID, value: 0 })
+      })
+    );
+  }
+
+  function attest_manager_revoke(bytes32 schemaUID, bytes32 attestationUID) public {
+    eas.revoke(
+      RevocationRequest({
+        schema: schemaUID,
+        data: RevocationRequestData({ uid: attestationUID, value: 0 })
+      })
+    );
   }
 }
