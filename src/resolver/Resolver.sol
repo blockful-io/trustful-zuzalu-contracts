@@ -90,29 +90,37 @@ contract Resolver is IResolver, AccessControl {
       return true;
     }
 
-    // Schema to assign villagers ( checkIn / checkOut )
+    // Schema to assign/disassociate villagers ( checkIn / checkOut )
     if (_allowedSchemas[attestation.schema][MANAGER_ROLE] == Action.ASSIGN_VILLAGER) {
       if (attestation.revocable) revert InvalidRevocability();
-      _checkRole(MANAGER_ROLE, attestation.attester);
 
-      // Check in if doesn't have Villager Role and is not checked out
+      string memory status = abi.decode(attestation.data, (string));
+
+      // Check if recipient doesn't have Villager Role and it's not checked out (haven't been checked in yet)
       if (
         !hasRole(VILLAGER_ROLE, attestation.recipient) &&
-        !_checkedOutVillagers[attestation.recipient]
+        !_checkedOutVillagers[attestation.recipient] &&
+        keccak256(bytes(status)) == keccak256("checkin")
       ) {
+        _checkRole(MANAGER_ROLE, attestation.attester);
         _grantRole(VILLAGER_ROLE, attestation.recipient);
-        // Check out if has Villager Role and is not checked out
-      } else if (
+        return true;
+      }
+
+      // Check if recipient has Villager Role and it's not checked out (is checked in)
+      if (
         hasRole(VILLAGER_ROLE, attestation.recipient) &&
-        !_checkedOutVillagers[attestation.recipient]
+        !_checkedOutVillagers[attestation.recipient] &&
+        // The attester must be the recipient
+        attestation.recipient == attestation.attester &&
+        keccak256(bytes(status)) == keccak256("checkout")
       ) {
         _revokeRole(VILLAGER_ROLE, attestation.recipient);
         _checkedOutVillagers[attestation.recipient] = true;
-      } else {
-        revert AlreadyCheckedOut();
+        return true;
       }
 
-      return true;
+      return false;
     }
 
     // Schema to create event attestations (Attestations)
@@ -122,8 +130,7 @@ contract Resolver is IResolver, AccessControl {
 
       // Titles for attestations must be included by the managers
       (string memory title, ) = abi.decode(attestation.data, (string, string));
-      if (!_allowedAttestationTitles[keccak256(abi.encode(title))])
-        revert InvalidAttestationTitle();
+      if (!_allowedAttestationTitles[keccak256(bytes(title))]) revert InvalidAttestationTitle();
 
       return true;
     }
@@ -171,7 +178,7 @@ contract Resolver is IResolver, AccessControl {
 
   /// @inheritdoc IResolver
   function setAttestationTitle(string memory title, bool isValid) public onlyRole(ROOT_ROLE) {
-    _allowedAttestationTitles[keccak256(abi.encode(title))] = isValid;
+    _allowedAttestationTitles[keccak256(bytes(title))] = isValid;
   }
 
   /// @dev ETH callback.
