@@ -18,7 +18,7 @@ contract RegistryTest is Test {
   }
 
   function test_registry_manager() public {
-    string memory schema = "";
+    string memory schema = "string role";
     bool revocable = true;
 
     bytes32 uid = schemaRegistry.register(schema, resolver, revocable);
@@ -27,7 +27,7 @@ contract RegistryTest is Test {
   }
 
   function test_registry_villager() public {
-    string memory schema = "";
+    string memory schema = "string status";
     bool revocable = false;
 
     bytes32 uid = schemaRegistry.register(schema, resolver, revocable);

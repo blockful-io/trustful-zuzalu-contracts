@@ -72,7 +72,7 @@ contract ResolverTest is Test {
     bytes32[] memory uids = new bytes32[](4);
 
     /// ASSIGN MANAGER SCHEMA
-    string memory schema = "";
+    string memory schema = "string role";
     bool revocable = true;
     uids[0] = schemaRegistry.register(schema, resolver, revocable);
     resolver.setSchema(uids[0], ROOT_ROLE, 1);
