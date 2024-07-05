@@ -26,6 +26,8 @@
   "scripts": {
     "clean": "rm -rf cache out",
     "build": "forge build",
+    "deploy": "forge create Resolver --rpc-url $RPC_OP_SEPOLIA --private-key $PRIVATE_KEY",
+    "verify": "forge verify-contract 0xa8e45C84d7725a0f6A556Fa54AFC20677f38998b --rpc-url $RPC_OP_SEPOLIA --etherscan-api-key $API_KEY_VERIFY --constructor-args $(cast abi-encode 'constructor(address)' 0x4200000000000000000000000000000000000021 )",
     "lint": "bun run lint:sol && bun run prettier:check",
     "lint:sol": "forge fmt --check && bun solhint {script,src,test}/**/*.sol",
     "prettier:check": "prettier --check \"**/*.{json,md,yml}\" --ignore-path \".prettierignore\"",
