@@ -77,13 +77,22 @@ contract Resolver is IResolver, AccessControl {
     return _allowedAttestationTitles[keccak256(abi.encode(title))];
   }
 
+  /// @dev Validates if the `action` is allowed for the given `role` and `schema`.
+  function isActionAllowed(
+    bytes32 uid,
+    bytes32 roleId,
+    Action action
+  ) internal view returns (bool) {
+    return _allowedSchemas[uid][roleId] == action;
+  }
+
   /// @inheritdoc IResolver
   function attest(Attestation calldata attestation) external payable onlyEAS returns (bool) {
     // Prohibits the attestation expiration to be finite
     if (attestation.expirationTime != NO_EXPIRATION_TIME) revert InvalidExpiration();
 
     // Schema to assign managers
-    if (_allowedSchemas[attestation.schema][ROOT_ROLE] == Action.ASSIGN_MANAGER) {
+    if (isActionAllowed(attestation.schema, ROOT_ROLE, Action.ASSIGN_MANAGER)) {
       if (!attestation.revocable) revert InvalidRevocability();
       _checkRole(ROOT_ROLE, attestation.attester);
       _grantRole(MANAGER_ROLE, attestation.recipient);
@@ -91,7 +100,7 @@ contract Resolver is IResolver, AccessControl {
     }
 
     // Schema to checkIn / checkOut villagers
-    if (_allowedSchemas[attestation.schema][MANAGER_ROLE] == Action.ASSIGN_VILLAGER) {
+    if (isActionAllowed(attestation.schema, MANAGER_ROLE, Action.ASSIGN_VILLAGER)) {
       if (attestation.revocable) revert InvalidRevocability();
 
       string memory status = abi.decode(attestation.data, (string));
@@ -124,7 +133,7 @@ contract Resolver is IResolver, AccessControl {
     }
 
     // Schema to create event attestations (Attestations)
-    if (_allowedSchemas[attestation.schema][VILLAGER_ROLE] == Action.ATTEST) {
+    if (isActionAllowed(attestation.schema, VILLAGER_ROLE, Action.ATTEST)) {
       if (attestation.revocable) revert InvalidRevocability();
       _checkRole(VILLAGER_ROLE, attestation.attester);
 
@@ -137,7 +146,7 @@ contract Resolver is IResolver, AccessControl {
     }
 
     // Schema to create a response ( true / false )
-    if (_allowedSchemas[attestation.schema][VILLAGER_ROLE] == Action.REPLY) {
+    if (isActionAllowed(attestation.schema, VILLAGER_ROLE, Action.REPLY)) {
       if (!attestation.revocable) revert InvalidRevocability();
       _checkRole(VILLAGER_ROLE, attestation.attester);
 
@@ -156,7 +165,7 @@ contract Resolver is IResolver, AccessControl {
   /// @inheritdoc IResolver
   function revoke(Attestation calldata attestation) external payable onlyEAS returns (bool) {
     // Schema to revoke managers
-    if (_allowedSchemas[attestation.schema][ROOT_ROLE] == Action.ASSIGN_MANAGER) {
+    if (isActionAllowed(attestation.schema, ROOT_ROLE, Action.ASSIGN_MANAGER)) {
       _checkRole(ROOT_ROLE, attestation.attester);
       _checkRole(MANAGER_ROLE, attestation.recipient);
       _revokeRole(MANAGER_ROLE, attestation.recipient);
@@ -164,7 +173,7 @@ contract Resolver is IResolver, AccessControl {
     }
 
     // Schema to revoke a response ( true / false )
-    if (_allowedSchemas[attestation.schema][VILLAGER_ROLE] == Action.REPLY) {
+    if (isActionAllowed(attestation.schema, VILLAGER_ROLE, Action.REPLY)) {
       _checkRole(VILLAGER_ROLE, attestation.attester);
       return true;
     }
