@@ -178,7 +178,7 @@ contract Resolver is IResolver, AccessControl {
 
   /// @inheritdoc IResolver
   function setAttestationTitle(string memory title, bool isValid) public onlyRole(ROOT_ROLE) {
-    _allowedAttestationTitles[keccak256(bytes(title))] = isValid;
+    _allowedAttestationTitles[keccak256(abi.encode(title))] = isValid;
   }
 
   /// @dev ETH callback.
