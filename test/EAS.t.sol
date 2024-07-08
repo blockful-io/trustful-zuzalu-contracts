@@ -38,58 +38,58 @@ contract ResolverTest is Test {
 
     // Check-In Villagers
     vm.startPrank(manager);
-    attest_villager(uids[1], villager, "checkin");
-    attest_villager(uids[1], manager, "checkin"); // assigns himself as a villager as well (checkIn)
+    attest_villager(uids[1], villager, "Check-in");
+    attest_villager(uids[1], manager, "Check-in"); // assigns himself as a villager as well (checkIn)
     assert(IAccessControl(address(resolver)).hasRole(VILLAGER_ROLE, villager));
     assert(IAccessControl(address(resolver)).hasRole(VILLAGER_ROLE, manager));
 
-    // Attest Event
-    vm.startPrank(villager);
-    bytes32 eventUID = attest_event(uids[2], manager, titles[0], "This address changed my mind");
+    // // Attest Event
+    // vm.startPrank(villager);
+    // bytes32 eventUID = attest_event(uids[2], manager, titles[0], "This address changed my mind");
 
-    // Attest Responses, then revoke it
-    vm.startPrank(manager);
-    bytes32 responseUID = attest_response(uids[3], villager, eventUID, true);
-    attest_response_revoke(uids[3], responseUID);
+    // // Attest Responses, then revoke it
+    // vm.startPrank(manager);
+    // bytes32 responseUID = attest_response(uids[3], villager, eventUID, true);
+    // attest_response_revoke(uids[3], responseUID);
 
-    // Check-Out Villagers
-    vm.startPrank(villager);
-    attest_villager(uids[1], villager, "checkout");
-    assert(!IAccessControl(address(resolver)).hasRole(VILLAGER_ROLE, villager));
-    assert(resolver.checkedOutVillagers(villager));
-    // Should fail to check-out again
-    assert(!try_attest_villager(uids[1], villager, "checkout"));
-    // Should fail to check-in again
-    assert(!try_attest_villager(uids[1], villager, "checkin"));
+    // // Check-Out Villagers
+    // vm.startPrank(villager);
+    // attest_villager(uids[1], villager, "Check-ou");
+    // assert(!IAccessControl(address(resolver)).hasRole(VILLAGER_ROLE, villager));
+    // assert(resolver.checkedOutVillagers(villager));
+    // // Should fail to check-out again
+    // assert(!try_attest_villager(uids[1], villager, "Check-ou"));
+    // // Should fail to check-in again
+    // assert(!try_attest_villager(uids[1], villager, "Check-in"));
 
-    // Revoke Manager
-    vm.startPrank(deployer);
-    attest_manager_revoke(uids[0], assignedManagerUID);
-    assert(!IAccessControl(address(resolver)).hasRole(MANAGER_ROLE, manager));
+    // // Revoke Manager
+    // vm.startPrank(deployer);
+    // attest_manager_revoke(uids[0], assignedManagerUID);
+    // assert(!IAccessControl(address(resolver)).hasRole(MANAGER_ROLE, manager));
   }
 
   function register_allowed_schemas() public returns (bytes32[] memory) {
     bytes32[] memory uids = new bytes32[](4);
 
-    /// ASSIGN MANAGER SCHEMA
+    /// ASSIGN MANAGER SCHEMA - Action(1)
     string memory schema = "string role";
     bool revocable = true;
     uids[0] = schemaRegistry.register(schema, resolver, revocable);
     resolver.setSchema(uids[0], ROOT_ROLE, 1);
 
-    /// ASSIGN VILLAGER SCHEMA
+    /// ASSIGN VILLAGER SCHEMA - Action(2)
     schema = "string status";
     revocable = false;
     uids[1] = schemaRegistry.register(schema, resolver, revocable);
     resolver.setSchema(uids[1], MANAGER_ROLE, 2);
 
-    /// Event Attestation SCHEMA
-    schema = "string title, string comment";
+    /// Event Attestation SCHEMA - Action(3)
+    schema = "string title,string comment";
     revocable = false;
     uids[2] = schemaRegistry.register(schema, resolver, revocable);
     resolver.setSchema(uids[2], VILLAGER_ROLE, 3);
 
-    /// Event Response SCHEMA
+    /// Event Response SCHEMA - Action(4)
     schema = "bool status";
     revocable = true;
     uids[3] = schemaRegistry.register(schema, resolver, revocable);

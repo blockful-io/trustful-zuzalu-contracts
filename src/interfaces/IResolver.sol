@@ -20,7 +20,7 @@ interface IResolver {
   function checkedOutVillagers(address villager) external view returns (bool);
 
   /// @dev Checks which action a role can perform on a schema.
-  function schemas(bytes32 uid, bytes32 roleId) external view returns (Action);
+  function allowedSchemas(bytes32 uid, bytes32 roleId) external view returns (Action);
 
   /// @dev Checks if a title is allowed to be attested.
   function allowedAttestationTitles(string memory title) external view returns (bool);

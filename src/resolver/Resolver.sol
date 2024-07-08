@@ -100,7 +100,7 @@ contract Resolver is IResolver, AccessControl {
       if (
         !hasRole(VILLAGER_ROLE, attestation.recipient) &&
         !_checkedOutVillagers[attestation.recipient] &&
-        keccak256(abi.encode(status)) == keccak256("checkin")
+        keccak256(abi.encode(status)) == keccak256(abi.encode("Check-in"))
       ) {
         _checkRole(MANAGER_ROLE, attestation.attester);
         _grantRole(VILLAGER_ROLE, attestation.recipient);
@@ -113,7 +113,7 @@ contract Resolver is IResolver, AccessControl {
         !_checkedOutVillagers[attestation.recipient] &&
         // The attester must be the recipient
         attestation.recipient == attestation.attester &&
-        keccak256(abi.encode(status)) == keccak256("checkout")
+        keccak256(abi.encode(status)) == keccak256(abi.encode("Check-ou"))
       ) {
         _revokeRole(VILLAGER_ROLE, attestation.recipient);
         _checkedOutVillagers[attestation.recipient] = true;
