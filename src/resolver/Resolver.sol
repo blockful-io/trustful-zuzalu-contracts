@@ -100,7 +100,7 @@ contract Resolver is IResolver, AccessControl {
       if (
         !hasRole(VILLAGER_ROLE, attestation.recipient) &&
         !_checkedOutVillagers[attestation.recipient] &&
-        keccak256(bytes(status)) == keccak256("checkin")
+        keccak256(abi.encode(status)) == keccak256("checkin")
       ) {
         _checkRole(MANAGER_ROLE, attestation.attester);
         _grantRole(VILLAGER_ROLE, attestation.recipient);
@@ -113,7 +113,7 @@ contract Resolver is IResolver, AccessControl {
         !_checkedOutVillagers[attestation.recipient] &&
         // The attester must be the recipient
         attestation.recipient == attestation.attester &&
-        keccak256(bytes(status)) == keccak256("checkout")
+        keccak256(abi.encode(status)) == keccak256("checkout")
       ) {
         _revokeRole(VILLAGER_ROLE, attestation.recipient);
         _checkedOutVillagers[attestation.recipient] = true;
@@ -130,7 +130,8 @@ contract Resolver is IResolver, AccessControl {
 
       // Titles for attestations must be included by the managers
       (string memory title, ) = abi.decode(attestation.data, (string, string));
-      if (!_allowedAttestationTitles[keccak256(bytes(title))]) revert InvalidAttestationTitle();
+      if (!_allowedAttestationTitles[keccak256(abi.encode(title))])
+        revert InvalidAttestationTitle();
 
       return true;
     }
