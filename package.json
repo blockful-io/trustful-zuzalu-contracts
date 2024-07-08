@@ -32,10 +32,10 @@
     "lint:sol": "forge fmt --check && bun solhint {script,src,test}/**/*.sol",
     "prettier:check": "prettier --check \"**/*.{json,md,yml}\" --ignore-path \".prettierignore\"",
     "prettier:write": "prettier --write \"**/*.{json,md,yml}\" --ignore-path \".prettierignore\"",
-    "test": "forge test --fork-url $RPC_OP_SEPOLIA -vvv --via-ir",
-    "test:registry": "forge test --match-test registry --fork-url $RPC_OP_SEPOLIA -vvv --via-ir",
-    "test:resolver": "forge test --match-test access_control --fork-url $RPC_OP_SEPOLIA -vvv --via-ir",
-    "test:attest": "forge test --match-test attestations --fork-url $RPC_OP_SEPOLIA -vvv --via-ir",
+    "test": "forge test --fork-url $RPC_OP -vvv --via-ir",
+    "test:registry": "forge test --match-test registry --fork-url $RPC_OP -vvv --via-ir",
+    "test:resolver": "forge test --match-test access_control --fork-url $RPC_OP -vvv --via-ir",
+    "test:attest": "forge test --match-test attestations --fork-url $RPC_OP -vvv --via-ir",
     "test:coverage": "forge coverage",
     "test:coverage:report": "forge coverage --report lcov && genhtml lcov.info --branch-coverage --output-dir coverage"
   }
