@@ -43,29 +43,29 @@ contract ResolverTest is Test {
     assert(IAccessControl(address(resolver)).hasRole(VILLAGER_ROLE, villager));
     assert(IAccessControl(address(resolver)).hasRole(VILLAGER_ROLE, manager));
 
-    // // Attest Event
-    // vm.startPrank(villager);
-    // bytes32 eventUID = attest_event(uids[2], manager, titles[0], "This address changed my mind");
+    // Attest Event
+    vm.startPrank(villager);
+    bytes32 eventUID = attest_event(uids[2], manager, titles[0], "This address changed my mind");
 
-    // // Attest Responses, then revoke it
-    // vm.startPrank(manager);
-    // bytes32 responseUID = attest_response(uids[3], villager, eventUID, true);
-    // attest_response_revoke(uids[3], responseUID);
+    // Attest Responses, then revoke it
+    vm.startPrank(manager);
+    bytes32 responseUID = attest_response(uids[3], villager, eventUID, true);
+    attest_response_revoke(uids[3], responseUID);
 
-    // // Check-Out Villagers
-    // vm.startPrank(villager);
-    // attest_villager(uids[1], villager, "Check-out");
-    // assert(!IAccessControl(address(resolver)).hasRole(VILLAGER_ROLE, villager));
-    // assert(resolver.checkedOutVillagers(villager));
-    // // Should fail to check-out again
-    // assert(!try_attest_villager(uids[1], villager, "Check-out"));
-    // // Should fail to check-in again
-    // assert(!try_attest_villager(uids[1], villager, "Check-in"));
+    // Check-Out Villagers
+    vm.startPrank(villager);
+    attest_villager(uids[1], villager, "Check-out");
+    assert(!IAccessControl(address(resolver)).hasRole(VILLAGER_ROLE, villager));
+    assert(resolver.checkedOutVillagers(villager));
+    // Should fail to check-out again
+    assert(!try_attest_villager(uids[1], villager, "Check-out"));
+    // Should fail to check-in again
+    assert(!try_attest_villager(uids[1], villager, "Check-in"));
 
-    // // Revoke Manager
-    // vm.startPrank(deployer);
-    // attest_manager_revoke(uids[0], assignedManagerUID);
-    // assert(!IAccessControl(address(resolver)).hasRole(MANAGER_ROLE, manager));
+    // Revoke Manager
+    vm.startPrank(deployer);
+    attest_manager_revoke(uids[0], assignedManagerUID);
+    assert(!IAccessControl(address(resolver)).hasRole(MANAGER_ROLE, manager));
   }
 
   function register_allowed_schemas() public returns (bytes32[] memory) {
