@@ -113,7 +113,7 @@ contract Resolver is IResolver, AccessControl {
         !_checkedOutVillagers[attestation.recipient] &&
         // The attester must be the recipient
         attestation.recipient == attestation.attester &&
-        keccak256(abi.encode(status)) == keccak256(abi.encode("Check-ou"))
+        keccak256(abi.encode(status)) == keccak256(abi.encode("Check-out"))
       ) {
         _revokeRole(VILLAGER_ROLE, attestation.recipient);
         _checkedOutVillagers[attestation.recipient] = true;

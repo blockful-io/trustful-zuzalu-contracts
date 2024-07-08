@@ -54,11 +54,11 @@ contract ResolverTest is Test {
 
     // // Check-Out Villagers
     // vm.startPrank(villager);
-    // attest_villager(uids[1], villager, "Check-ou");
+    // attest_villager(uids[1], villager, "Check-out");
     // assert(!IAccessControl(address(resolver)).hasRole(VILLAGER_ROLE, villager));
     // assert(resolver.checkedOutVillagers(villager));
     // // Should fail to check-out again
-    // assert(!try_attest_villager(uids[1], villager, "Check-ou"));
+    // assert(!try_attest_villager(uids[1], villager, "Check-out"));
     // // Should fail to check-in again
     // assert(!try_attest_villager(uids[1], villager, "Check-in"));
 
