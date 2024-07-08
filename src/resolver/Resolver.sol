@@ -68,7 +68,7 @@ contract Resolver is IResolver, AccessControl {
   }
 
   /// @inheritdoc IResolver
-  function schemas(bytes32 uid, bytes32 roleId) public view returns (Action) {
+  function allowedSchemas(bytes32 uid, bytes32 roleId) public view returns (Action) {
     return _allowedSchemas[uid][roleId];
   }
 
@@ -90,7 +90,7 @@ contract Resolver is IResolver, AccessControl {
       return true;
     }
 
-    // Schema to assign/disassociate villagers ( checkIn / checkOut )
+    // Schema to checkIn / checkOut villagers
     if (_allowedSchemas[attestation.schema][MANAGER_ROLE] == Action.ASSIGN_VILLAGER) {
       if (attestation.revocable) revert InvalidRevocability();
 
@@ -100,7 +100,7 @@ contract Resolver is IResolver, AccessControl {
       if (
         !hasRole(VILLAGER_ROLE, attestation.recipient) &&
         !_checkedOutVillagers[attestation.recipient] &&
-        keccak256(bytes(status)) == keccak256("checkin")
+        keccak256(abi.encode(status)) == keccak256(abi.encode("Check-in"))
       ) {
         _checkRole(MANAGER_ROLE, attestation.attester);
         _grantRole(VILLAGER_ROLE, attestation.recipient);
@@ -113,7 +113,7 @@ contract Resolver is IResolver, AccessControl {
         !_checkedOutVillagers[attestation.recipient] &&
         // The attester must be the recipient
         attestation.recipient == attestation.attester &&
-        keccak256(bytes(status)) == keccak256("checkout")
+        keccak256(abi.encode(status)) == keccak256(abi.encode("Check-out"))
       ) {
         _revokeRole(VILLAGER_ROLE, attestation.recipient);
         _checkedOutVillagers[attestation.recipient] = true;
@@ -130,7 +130,8 @@ contract Resolver is IResolver, AccessControl {
 
       // Titles for attestations must be included by the managers
       (string memory title, ) = abi.decode(attestation.data, (string, string));
-      if (!_allowedAttestationTitles[keccak256(bytes(title))]) revert InvalidAttestationTitle();
+      if (!_allowedAttestationTitles[keccak256(abi.encode(title))])
+        revert InvalidAttestationTitle();
 
       return true;
     }
@@ -178,7 +179,7 @@ contract Resolver is IResolver, AccessControl {
 
   /// @inheritdoc IResolver
   function setAttestationTitle(string memory title, bool isValid) public onlyRole(ROOT_ROLE) {
-    _allowedAttestationTitles[keccak256(bytes(title))] = isValid;
+    _allowedAttestationTitles[keccak256(abi.encode(title))] = isValid;
   }
 
   /// @dev ETH callback.

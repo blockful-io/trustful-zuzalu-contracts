@@ -38,8 +38,8 @@ contract ResolverTest is Test {
 
     // Check-In Villagers
     vm.startPrank(manager);
-    attest_villager(uids[1], villager, "checkin");
-    attest_villager(uids[1], manager, "checkin"); // assigns himself as a villager as well (checkIn)
+    attest_villager(uids[1], villager, "Check-in");
+    attest_villager(uids[1], manager, "Check-in"); // assigns himself as a villager as well (checkIn)
     assert(IAccessControl(address(resolver)).hasRole(VILLAGER_ROLE, villager));
     assert(IAccessControl(address(resolver)).hasRole(VILLAGER_ROLE, manager));
 
@@ -54,13 +54,13 @@ contract ResolverTest is Test {
 
     // Check-Out Villagers
     vm.startPrank(villager);
-    attest_villager(uids[1], villager, "checkout");
+    attest_villager(uids[1], villager, "Check-out");
     assert(!IAccessControl(address(resolver)).hasRole(VILLAGER_ROLE, villager));
     assert(resolver.checkedOutVillagers(villager));
     // Should fail to check-out again
-    assert(!try_attest_villager(uids[1], villager, "checkout"));
+    assert(!try_attest_villager(uids[1], villager, "Check-out"));
     // Should fail to check-in again
-    assert(!try_attest_villager(uids[1], villager, "checkin"));
+    assert(!try_attest_villager(uids[1], villager, "Check-in"));
 
     // Revoke Manager
     vm.startPrank(deployer);
@@ -71,25 +71,25 @@ contract ResolverTest is Test {
   function register_allowed_schemas() public returns (bytes32[] memory) {
     bytes32[] memory uids = new bytes32[](4);
 
-    /// ASSIGN MANAGER SCHEMA
+    /// ASSIGN MANAGER SCHEMA - Action(1)
     string memory schema = "string role";
     bool revocable = true;
     uids[0] = schemaRegistry.register(schema, resolver, revocable);
     resolver.setSchema(uids[0], ROOT_ROLE, 1);
 
-    /// ASSIGN VILLAGER SCHEMA
+    /// ASSIGN VILLAGER SCHEMA - Action(2)
     schema = "string status";
     revocable = false;
     uids[1] = schemaRegistry.register(schema, resolver, revocable);
     resolver.setSchema(uids[1], MANAGER_ROLE, 2);
 
-    /// Event Attestation SCHEMA
-    schema = "string title, string comment";
+    /// Event Attestation SCHEMA - Action(3)
+    schema = "string title,string comment";
     revocable = false;
     uids[2] = schemaRegistry.register(schema, resolver, revocable);
     resolver.setSchema(uids[2], VILLAGER_ROLE, 3);
 
-    /// Event Response SCHEMA
+    /// Event Response SCHEMA - Action(4)
     schema = "bool status";
     revocable = true;
     uids[3] = schemaRegistry.register(schema, resolver, revocable);

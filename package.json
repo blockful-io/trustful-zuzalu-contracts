@@ -26,16 +26,16 @@
   "scripts": {
     "clean": "rm -rf cache out",
     "build": "forge build",
-    "deploy": "forge create Resolver --rpc-url $RPC_OP_SEPOLIA --private-key $PRIVATE_KEY",
-    "verify": "forge verify-contract 0xa8e45C84d7725a0f6A556Fa54AFC20677f38998b --rpc-url $RPC_OP_SEPOLIA --etherscan-api-key $API_KEY_VERIFY --constructor-args $(cast abi-encode 'constructor(address)' 0x4200000000000000000000000000000000000021 )",
+    "deploy": "forge create Resolver --rpc-url $RPC_OP --private-key $PRIVATE_KEY --constructor-args 0x4200000000000000000000000000000000000021",
+    "verify": "forge verify-contract $ADDRESS_RESOLVER --rpc-url $RPC_OP --etherscan-api-key $API_KEY_OPTIMISTIC_ETHERSCAN --constructor-args $(cast abi-encode 'constructor(address)' 0x4200000000000000000000000000000000000021 )",
     "lint": "bun run lint:sol && bun run prettier:check",
     "lint:sol": "forge fmt --check && bun solhint {script,src,test}/**/*.sol",
     "prettier:check": "prettier --check \"**/*.{json,md,yml}\" --ignore-path \".prettierignore\"",
     "prettier:write": "prettier --write \"**/*.{json,md,yml}\" --ignore-path \".prettierignore\"",
-    "test": "forge test",
-    "test:registry": "forge test --match-test registry --fork-url https://mainnet.optimism.io -vvv --via-ir",
-    "test:resolver": "forge test --match-test access_control --fork-url https://mainnet.optimism.io -vvv --via-ir",
-    "test:attest": "forge test --match-test attestations --fork-url https://mainnet.optimism.io -vvv --via-ir",
+    "test": "forge test --fork-url $RPC_OP -vvv --via-ir",
+    "test:registry": "forge test --match-test registry --fork-url $RPC_OP -vvv --via-ir",
+    "test:resolver": "forge test --match-test access_control --fork-url $RPC_OP -vvv --via-ir",
+    "test:attest": "forge test --match-test attestations --fork-url $RPC_OP -vvv --via-ir",
     "test:coverage": "forge coverage",
     "test:coverage:report": "forge coverage --report lcov && genhtml lcov.info --branch-coverage --output-dir coverage"
   }
