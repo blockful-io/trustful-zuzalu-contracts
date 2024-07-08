@@ -90,7 +90,7 @@ contract Resolver is IResolver, AccessControl {
       return true;
     }
 
-    // Schema to assign/disassociate villagers ( checkIn / checkOut )
+    // Schema to checkIn / checkOut villagers
     if (_allowedSchemas[attestation.schema][MANAGER_ROLE] == Action.ASSIGN_VILLAGER) {
       if (attestation.revocable) revert InvalidRevocability();
 
