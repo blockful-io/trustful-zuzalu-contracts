@@ -68,7 +68,7 @@ contract Resolver is IResolver, AccessControl {
   }
 
   /// @inheritdoc IResolver
-  function schemas(bytes32 uid, bytes32 roleId) public view returns (Action) {
+  function allowedSchemas(bytes32 uid, bytes32 roleId) public view returns (Action) {
     return _allowedSchemas[uid][roleId];
   }
 
