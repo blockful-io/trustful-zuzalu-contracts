@@ -34,7 +34,7 @@ contract ResolverTest is Test {
     string[] memory titles = register_allowed_titles();
 
     // Assign manager
-    bytes32 assignedManagerUID = attest_manager(uids[0], manager);
+    bytes32 assignedManagerUID = attest_manager(uids[0], manager, "Manager");
 
     // Check-In Villagers
     vm.startPrank(manager);
@@ -111,7 +111,11 @@ contract ResolverTest is Test {
     return titles;
   }
 
-  function attest_manager(bytes32 schemaUID, address recipient) public returns (bytes32) {
+  function attest_manager(
+    bytes32 schemaUID,
+    address recipient,
+    string memory role
+  ) public returns (bytes32) {
     return
       eas.attest(
         AttestationRequest({
@@ -121,7 +125,7 @@ contract ResolverTest is Test {
             expirationTime: 0,
             revocable: true,
             refUID: 0,
-            data: "",
+            data: abi.encode(role),
             value: 0
           })
         })
