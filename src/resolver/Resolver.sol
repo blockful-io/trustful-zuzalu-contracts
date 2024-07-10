@@ -93,7 +93,10 @@ contract Resolver is IResolver, AccessControl {
     if (attestation.expirationTime != NO_EXPIRATION_TIME) revert InvalidExpiration();
 
     // Schema to assign managers
-    if (isActionAllowed(attestation.schema, ROOT_ROLE, Action.ASSIGN_MANAGER)) {
+    if (
+      isActionAllowed(attestation.schema, ROOT_ROLE, Action.ASSIGN_MANAGER) &&
+      !hasRole(MANAGER_ROLE, attestation.recipient)
+    ) {
       if (!attestation.revocable) revert InvalidRevocability();
 
       string memory role = abi.decode(attestation.data, (string));
