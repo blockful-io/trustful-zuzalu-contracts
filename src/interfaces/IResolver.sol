@@ -53,8 +53,4 @@ interface IResolver {
   /// @param roleId The role ID that are allowed to attest using the schema.
   /// @param action The action that the role can perform on the schema.
   function setSchema(bytes32 uid, bytes32 roleId, uint256 action) external;
-
-  /// @dev Withdraws the balance of the resolver.
-  /// Requires the caller to have the ROOT_ROLE.
-  function withdraw() external;
 }

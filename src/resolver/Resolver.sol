@@ -199,12 +199,6 @@ contract Resolver is IResolver, AccessControl {
     _allowedSchemas[uid][roleId] = Action(action);
   }
 
-  /// @inheritdoc IResolver
-  function withdraw() public onlyRole(ROOT_ROLE) {
-    (bool success, ) = payable(msg.sender).call{ value: address(this).balance }("");
-    if (!success) revert InvalidWithdraw();
-  }
-
   /// @dev ETH callback.
   receive() external payable virtual {
     if (!isPayable()) {
