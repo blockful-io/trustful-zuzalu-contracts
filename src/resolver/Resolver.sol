@@ -4,21 +4,22 @@ pragma solidity ^0.8.4;
 
 import { IEAS, Attestation } from "../interfaces/IEAS.sol";
 import { IResolver } from "../interfaces/IResolver.sol";
-import { AccessDenied, InvalidEAS, InvalidLength, uncheckedInc, EMPTY_UID, NO_EXPIRATION_TIME } from "../Common.sol";
 import { AccessControl } from "@openzeppelin/contracts/access/AccessControl.sol";
+import { AccessDenied, InvalidEAS, InvalidLength, uncheckedInc, EMPTY_UID, NO_EXPIRATION_TIME } from "../Common.sol";
 
+error AlreadyCheckedOut();
 error InsufficientValue();
+error InvalidAttestationTitle();
+error InvalidExpiration();
+error InvalidRefUID();
+error InvalidRevocability();
+error InvalidRole();
+error InvalidWithdraw();
 error NotPayable();
 error Unauthorized();
-error AlreadyCheckedOut();
-error InvalidAttestationTitle();
-error InvalidRefUID();
-error InvalidExpiration();
-error InvalidRevocability();
 
-/// @title Resolver
 /// @author Blockful | 0xneves
-/// @notice ZuVillage Resolver contract.
+/// @notice ZuVillage Resolver contract for Ethereum Attestation Service.
 contract Resolver is IResolver, AccessControl {
   // The global EAS contract.
   IEAS internal immutable _eas;
@@ -28,13 +29,13 @@ contract Resolver is IResolver, AccessControl {
   bytes32 public constant MANAGER_ROLE = keccak256("MANAGER_ROLE");
   bytes32 public constant VILLAGER_ROLE = keccak256("VILLAGER_ROLE");
 
-  // Addresses to booleans to check if a Villager is checked in or out
+  // Maps addresses to booleans to check if a Villager has checked out
   mapping(address => bool) private _checkedOutVillagers;
 
-  // Schemas ID to role ID to action
+  // Maps schemas ID and role ID to action
   mapping(bytes32 => mapping(bytes32 => Action)) private _allowedSchemas;
 
-  // Allowed Attestations (Hashed titles that can be attested)
+  // Maps allowed attestations (Hashed titles that can be attested)
   mapping(bytes32 => bool) private _allowedAttestationTitles;
 
   /// @dev Creates a new resolver.
@@ -68,13 +69,13 @@ contract Resolver is IResolver, AccessControl {
   }
 
   /// @inheritdoc IResolver
-  function allowedSchemas(bytes32 uid, bytes32 roleId) public view returns (Action) {
-    return _allowedSchemas[uid][roleId];
+  function allowedAttestationTitles(string memory title) public view returns (bool) {
+    return _allowedAttestationTitles[keccak256(abi.encode(title))];
   }
 
   /// @inheritdoc IResolver
-  function allowedAttestationTitles(string memory title) public view returns (bool) {
-    return _allowedAttestationTitles[keccak256(abi.encode(title))];
+  function allowedSchemas(bytes32 uid, bytes32 roleId) public view returns (Action) {
+    return _allowedSchemas[uid][roleId];
   }
 
   /// @dev Validates if the `action` is allowed for the given `role` and `schema`.
@@ -94,6 +95,10 @@ contract Resolver is IResolver, AccessControl {
     // Schema to assign managers
     if (isActionAllowed(attestation.schema, ROOT_ROLE, Action.ASSIGN_MANAGER)) {
       if (!attestation.revocable) revert InvalidRevocability();
+
+      string memory role = abi.decode(attestation.data, (string));
+      if (keccak256(abi.encode(role)) != keccak256(abi.encode("Manager"))) revert InvalidRole();
+
       _checkRole(ROOT_ROLE, attestation.attester);
       _grantRole(MANAGER_ROLE, attestation.recipient);
       return true;
@@ -128,8 +133,6 @@ contract Resolver is IResolver, AccessControl {
         _checkedOutVillagers[attestation.recipient] = true;
         return true;
       }
-
-      return false;
     }
 
     // Schema to create event attestations (Attestations)
@@ -137,7 +140,8 @@ contract Resolver is IResolver, AccessControl {
       if (attestation.revocable) revert InvalidRevocability();
       _checkRole(VILLAGER_ROLE, attestation.attester);
 
-      // Titles for attestations must be included by the managers
+      // Titles for attestations must be included in this contract by the managers
+      // via the {setAttestationTitle} function
       (string memory title, ) = abi.decode(attestation.data, (string, string));
       if (!_allowedAttestationTitles[keccak256(abi.encode(title))])
         revert InvalidAttestationTitle();
@@ -159,6 +163,7 @@ contract Resolver is IResolver, AccessControl {
 
       return true;
     }
+
     return false;
   }
 
@@ -182,13 +187,19 @@ contract Resolver is IResolver, AccessControl {
   }
 
   /// @inheritdoc IResolver
+  function setAttestationTitle(string memory title, bool isValid) public onlyRole(ROOT_ROLE) {
+    _allowedAttestationTitles[keccak256(abi.encode(title))] = isValid;
+  }
+
+  /// @inheritdoc IResolver
   function setSchema(bytes32 uid, bytes32 roleId, uint256 action) public onlyRole(ROOT_ROLE) {
     _allowedSchemas[uid][roleId] = Action(action);
   }
 
   /// @inheritdoc IResolver
-  function setAttestationTitle(string memory title, bool isValid) public onlyRole(ROOT_ROLE) {
-    _allowedAttestationTitles[keccak256(abi.encode(title))] = isValid;
+  function withdraw() public onlyRole(ROOT_ROLE) {
+    (bool success, ) = payable(msg.sender).call{ value: address(this).balance }("");
+    if (!success) revert InvalidWithdraw();
   }
 
   /// @dev ETH callback.
