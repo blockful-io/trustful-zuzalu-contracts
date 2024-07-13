@@ -33,7 +33,7 @@ contract Resolver is IResolver, AccessControl {
   mapping(address => bool) private _checkedOutVillagers;
 
   // Maps schemas ID and role ID to action
-  mapping(bytes32 => mapping(bytes32 => Action)) private _allowedSchemas;
+  mapping(bytes32 => Action) private _allowedSchemas;
 
   // Maps allowed attestations (Hashed titles that can be attested)
   mapping(bytes32 => bool) private _allowedAttestationTitles;
@@ -44,12 +44,15 @@ contract Resolver is IResolver, AccessControl {
     if (address(eas) == address(0)) revert InvalidEAS();
     _eas = eas;
 
-    // Assigns ROOT_ROLE to the deployer
-    _grantRole(ROOT_ROLE, msg.sender);
     // Assigns ROOT_ROLE as the admin of all roles
     _setRoleAdmin(ROOT_ROLE, ROOT_ROLE);
     _setRoleAdmin(MANAGER_ROLE, ROOT_ROLE);
     _setRoleAdmin(VILLAGER_ROLE, ROOT_ROLE);
+
+    // Assigns all roles to the deployer
+    _grantRole(ROOT_ROLE, msg.sender);
+    _grantRole(MANAGER_ROLE, msg.sender);
+    _grantRole(VILLAGER_ROLE, msg.sender);
   }
 
   /// @dev Ensures that only the EAS contract can make this call.
@@ -74,17 +77,13 @@ contract Resolver is IResolver, AccessControl {
   }
 
   /// @inheritdoc IResolver
-  function allowedSchemas(bytes32 uid, bytes32 roleId) public view returns (Action) {
-    return _allowedSchemas[uid][roleId];
+  function allowedSchemas(bytes32 uid) public view returns (Action) {
+    return _allowedSchemas[uid];
   }
 
   /// @dev Validates if the `action` is allowed for the given `role` and `schema`.
-  function isActionAllowed(
-    bytes32 uid,
-    bytes32 roleId,
-    Action action
-  ) internal view returns (bool) {
-    return _allowedSchemas[uid][roleId] == action;
+  function isActionAllowed(bytes32 uid, Action action) internal view returns (bool) {
+    return _allowedSchemas[uid] == action;
   }
 
   /// @inheritdoc IResolver
@@ -93,78 +92,22 @@ contract Resolver is IResolver, AccessControl {
     if (attestation.expirationTime != NO_EXPIRATION_TIME) revert InvalidExpiration();
 
     // Schema to assign managers
-    if (
-      isActionAllowed(attestation.schema, ROOT_ROLE, Action.ASSIGN_MANAGER) &&
-      !hasRole(MANAGER_ROLE, attestation.recipient)
-    ) {
-      if (!attestation.revocable) revert InvalidRevocability();
-
-      string memory role = abi.decode(attestation.data, (string));
-      if (keccak256(abi.encode(role)) != keccak256(abi.encode("Manager"))) revert InvalidRole();
-
-      _checkRole(ROOT_ROLE, attestation.attester);
-      _grantRole(MANAGER_ROLE, attestation.recipient);
-      return true;
-    }
+    if (isActionAllowed(attestation.schema, Action.ASSIGN_MANAGER))
+      return assignManager(attestation);
 
     // Schema to checkIn / checkOut villagers
-    if (isActionAllowed(attestation.schema, MANAGER_ROLE, Action.ASSIGN_VILLAGER)) {
-      if (attestation.revocable) revert InvalidRevocability();
-
-      string memory status = abi.decode(attestation.data, (string));
-
-      // Check if recipient doesn't have Villager Role and it's not checked out (haven't been checked in yet)
-      if (
-        !hasRole(VILLAGER_ROLE, attestation.recipient) &&
-        !_checkedOutVillagers[attestation.recipient] &&
-        keccak256(abi.encode(status)) == keccak256(abi.encode("Check-in"))
-      ) {
-        _checkRole(MANAGER_ROLE, attestation.attester);
-        _grantRole(VILLAGER_ROLE, attestation.recipient);
-        return true;
-      }
-
-      // Check if recipient has Villager Role and it's not checked out (is checked in)
-      if (
-        hasRole(VILLAGER_ROLE, attestation.recipient) &&
-        !_checkedOutVillagers[attestation.recipient] &&
-        // The attester must be the recipient
-        attestation.recipient == attestation.attester &&
-        keccak256(abi.encode(status)) == keccak256(abi.encode("Check-out"))
-      ) {
-        _revokeRole(VILLAGER_ROLE, attestation.recipient);
-        _checkedOutVillagers[attestation.recipient] = true;
-        return true;
-      }
+    if (isActionAllowed(attestation.schema, Action.ASSIGN_VILLAGER)) {
+      return assignVillager(attestation);
     }
 
     // Schema to create event attestations (Attestations)
-    if (isActionAllowed(attestation.schema, VILLAGER_ROLE, Action.ATTEST)) {
-      if (attestation.revocable) revert InvalidRevocability();
-      _checkRole(VILLAGER_ROLE, attestation.attester);
-
-      // Titles for attestations must be included in this contract by the managers
-      // via the {setAttestationTitle} function
-      (string memory title, ) = abi.decode(attestation.data, (string, string));
-      if (!_allowedAttestationTitles[keccak256(abi.encode(title))])
-        revert InvalidAttestationTitle();
-
-      return true;
+    if (isActionAllowed(attestation.schema, Action.ATTEST)) {
+      return attestEvent(attestation);
     }
 
     // Schema to create a response ( true / false )
-    if (isActionAllowed(attestation.schema, VILLAGER_ROLE, Action.REPLY)) {
-      if (!attestation.revocable) revert InvalidRevocability();
-      _checkRole(VILLAGER_ROLE, attestation.attester);
-
-      // Checks if the attestation has a non empty reference
-      if (attestation.refUID == EMPTY_UID) revert InvalidRefUID();
-      Attestation memory attesterRef = _eas.getAttestation(attestation.refUID);
-      // Match the attester of this attestation with the recipient of the reference attestation
-      // The response is designed to be a reply to a previous attestation
-      if (attesterRef.recipient != attestation.attester) revert InvalidRefUID();
-
-      return true;
+    if (isActionAllowed(attestation.schema, Action.REPLY)) {
+      return attestResponse(attestation);
     }
 
     return false;
@@ -173,7 +116,7 @@ contract Resolver is IResolver, AccessControl {
   /// @inheritdoc IResolver
   function revoke(Attestation calldata attestation) external payable onlyEAS returns (bool) {
     // Schema to revoke managers
-    if (isActionAllowed(attestation.schema, ROOT_ROLE, Action.ASSIGN_MANAGER)) {
+    if (isActionAllowed(attestation.schema, Action.ASSIGN_MANAGER)) {
       _checkRole(ROOT_ROLE, attestation.attester);
       _checkRole(MANAGER_ROLE, attestation.recipient);
       _revokeRole(MANAGER_ROLE, attestation.recipient);
@@ -181,7 +124,7 @@ contract Resolver is IResolver, AccessControl {
     }
 
     // Schema to revoke a response ( true / false )
-    if (isActionAllowed(attestation.schema, VILLAGER_ROLE, Action.REPLY)) {
+    if (isActionAllowed(attestation.schema, Action.REPLY)) {
       _checkRole(VILLAGER_ROLE, attestation.attester);
       return true;
     }
@@ -189,14 +132,97 @@ contract Resolver is IResolver, AccessControl {
     return false;
   }
 
+  /// @dev Assign new managers to the contract.
+  function assignManager(Attestation calldata attestation) internal returns (bool) {
+    if (hasRole(ROOT_ROLE, attestation.attester) || hasRole(MANAGER_ROLE, attestation.attester)) {
+      if (hasRole(MANAGER_ROLE, attestation.recipient)) revert InvalidRole();
+      if (!attestation.revocable) revert InvalidRevocability();
+
+      string memory role = abi.decode(attestation.data, (string));
+      if (keccak256(abi.encode(role)) != keccak256(abi.encode("Manager"))) revert InvalidRole();
+
+      _grantRole(MANAGER_ROLE, attestation.recipient);
+      return true;
+    }
+
+    return false;
+  }
+
+  /// @dev Assign new villagers by checking in or revoke them by checking out.
+  function assignVillager(Attestation calldata attestation) internal returns (bool) {
+    if (attestation.revocable) revert InvalidRevocability();
+
+    string memory status = abi.decode(attestation.data, (string));
+
+    // Check if recipient doesn't have Villager Role and it's not checked out (haven't been checked in yet)
+    if (
+      !hasRole(VILLAGER_ROLE, attestation.recipient) &&
+      !_checkedOutVillagers[attestation.recipient] &&
+      keccak256(abi.encode(status)) == keccak256(abi.encode("Check-in"))
+    ) {
+      _checkRole(MANAGER_ROLE, attestation.attester);
+      _grantRole(VILLAGER_ROLE, attestation.recipient);
+      return true;
+    }
+
+    // Check if recipient has Villager Role and it's not checked out (is checked in)
+    if (
+      hasRole(VILLAGER_ROLE, attestation.recipient) &&
+      !_checkedOutVillagers[attestation.recipient] &&
+      keccak256(abi.encode(status)) == keccak256(abi.encode("Check-out")) &&
+      (attestation.recipient == attestation.attester || hasRole(MANAGER_ROLE, attestation.attester))
+    ) {
+      // Checks if the attestation has a non empty reference
+      if (attestation.refUID == EMPTY_UID) revert InvalidRefUID();
+      Attestation memory attesterRef = _eas.getAttestation(attestation.refUID);
+      // Match the attester of this attestation with the recipient of the reference attestation
+      // The check-out is designed to be a reply to a previous check-in
+      if (attesterRef.recipient != attestation.recipient) revert InvalidRefUID();
+
+      _revokeRole(VILLAGER_ROLE, attestation.recipient);
+      _checkedOutVillagers[attestation.recipient] = true;
+      return true;
+    }
+
+    return false;
+  }
+
+  /// @dev Attest an event badge.
+  function attestEvent(Attestation calldata attestation) internal view returns (bool) {
+    if (attestation.revocable) revert InvalidRevocability();
+    _checkRole(VILLAGER_ROLE, attestation.attester);
+
+    // Titles for attestations must be included in this contract by the managers
+    // via the {setAttestationTitle} function
+    (string memory title, ) = abi.decode(attestation.data, (string, string));
+    if (!_allowedAttestationTitles[keccak256(abi.encode(title))]) revert InvalidAttestationTitle();
+
+    return true;
+  }
+
+  /// @dev Attest a response to an event badge emitted by {attestEvent}.
+  function attestResponse(Attestation calldata attestation) internal view returns (bool) {
+    if (!attestation.revocable) revert InvalidRevocability();
+    _checkRole(VILLAGER_ROLE, attestation.attester);
+
+    // Checks if the attestation has a non empty reference
+    if (attestation.refUID == EMPTY_UID) revert InvalidRefUID();
+    Attestation memory attesterRef = _eas.getAttestation(attestation.refUID);
+    // Match the attester of this attestation with the recipient of the reference attestation
+    // The response is designed to be a reply to a previous attestation
+    if (attesterRef.recipient != attestation.attester) revert InvalidRefUID();
+
+    return true;
+  }
+
   /// @inheritdoc IResolver
-  function setAttestationTitle(string memory title, bool isValid) public onlyRole(ROOT_ROLE) {
+  function setAttestationTitle(string memory title, bool isValid) public onlyRole(MANAGER_ROLE) {
     _allowedAttestationTitles[keccak256(abi.encode(title))] = isValid;
   }
 
   /// @inheritdoc IResolver
-  function setSchema(bytes32 uid, bytes32 roleId, uint256 action) public onlyRole(ROOT_ROLE) {
-    _allowedSchemas[uid][roleId] = Action(action);
+  function setSchema(bytes32 uid, uint256 action) public onlyRole(ROOT_ROLE) {
+    _allowedSchemas[uid] = Action(action);
   }
 
   /// @dev ETH callback.

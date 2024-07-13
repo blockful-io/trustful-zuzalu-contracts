@@ -12,18 +12,22 @@ to access the access control features and verify the user's identity to operate 
 
 **ROOT:** The ROOT role is the owner of the Resolver contract.
 
-- It has the permisison to add and remove roles from the contract.
-- It has the permission to set allowed titles to be used in attestations. During ZuVillage, badges
-  have titles and comments, and the titles are fixed and defined by the event organizers. We need
-  this to validate that the attestation follows the standards. the user can give to others in the
-  dApp context.
-- It has the permisison to set allowed actions to EAS schemas by providing the uid and the action
-  name. This is how the resolver knows which action is being requested by the attestation.
+- It has the permisison to give Manager badges to other participants, or remove them.
+- It has the permisison to add and remove roles from the contract outside the EAS scope.
+- It has the permisison to register allowed actions to EAS schemas by providing the uid and the
+  action ID. This is how the resolver knows which action is being requested by the attestation.
+  **NOTICE: This will dratiscally influence the behavior of the dApp, only configure if you know
+  what you are doing.**
 
 **MANAGER:** The MANAGER handler of checkin/checkout operations in the dApp.
 
 - It has the permission to checkin participants.
 - It has the permission to checkout participants.
+- It has the permisison to give Manager badges to other participants, or remove them.
+- It has the permission to set allowed titles to be used in attestations. During ZuVillage, badges
+  have titles and comments, and the titles are fixed and defined by the event organizers. We need
+  this to validate that the attestation follows the standards. the user can give to others in the
+  dApp context.
 
 **VILLAGER:** The VILLAGER role is for the event participant.
 

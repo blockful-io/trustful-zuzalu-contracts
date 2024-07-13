@@ -26,7 +26,7 @@ interface IResolver {
   function allowedAttestationTitles(string memory title) external view returns (bool);
 
   /// @dev Checks which action a role can perform on a schema.
-  function allowedSchemas(bytes32 uid, bytes32 roleId) external view returns (Action);
+  function allowedSchemas(bytes32 uid) external view returns (Action);
 
   /// @notice Processes an attestation and verifies whether it's valid.
   /// @param attestation The new attestation.
@@ -45,12 +45,10 @@ interface IResolver {
   /// @param isValid Whether the title for the attestation is valid or not. Defaults to false.
   function setAttestationTitle(string memory title, bool isValid) external;
 
-  /// @dev Sets the role ID that can attest using a schema.
+  /// @dev Sets the action ID that schema can perform.
   /// The schema determines the data layout for the attestation, while the attestation
-  /// determines the data that will fill the schema. When hooking the resolver from the
-  /// EAS contract, the attester should hodl the right role to attest with the schema.
+  /// determines the data that will fill the schema data.
   /// @param uid The UID of the schema.
-  /// @param roleId The role ID that are allowed to attest using the schema.
   /// @param action The action that the role can perform on the schema.
-  function setSchema(bytes32 uid, bytes32 roleId, uint256 action) external;
+  function setSchema(bytes32 uid, uint256 action) external;
 }
