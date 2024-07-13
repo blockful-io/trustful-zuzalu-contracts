@@ -62,35 +62,35 @@ contract ResolverTest is Test {
     bytes32[] memory uids = new bytes32[](4);
 
     /// ASSIGN MANAGER SCHEMA
-    string memory schema = "";
+    string memory schema = "string role";
     bool revocable = true;
     bytes32 uid = schemaRegistry.register(schema, resolver, revocable);
-    resolver.setSchema(uid, ROOT_ROLE, 1);
-    assert(resolver.allowedSchemas(uid, ROOT_ROLE) == IResolver.Action.ASSIGN_MANAGER);
+    resolver.setSchema(uid, 1);
+    assert(resolver.allowedSchemas(uid) == IResolver.Action.ASSIGN_MANAGER);
     uids[0] = uid;
 
     /// ASSIGN VILLAGER SCHEMA
-    schema = "";
+    schema = "string status";
     revocable = false;
     uid = schemaRegistry.register(schema, resolver, revocable);
-    resolver.setSchema(uid, MANAGER_ROLE, 2);
-    assert(resolver.allowedSchemas(uid, MANAGER_ROLE) == IResolver.Action.ASSIGN_VILLAGER);
+    resolver.setSchema(uid, 2);
+    assert(resolver.allowedSchemas(uid) == IResolver.Action.ASSIGN_VILLAGER);
     uids[1] = uid;
 
     /// Event Attestation SCHEMA
-    schema = "string title, string comment";
+    schema = "string title,string comment";
     revocable = false;
     uid = schemaRegistry.register(schema, resolver, revocable);
-    resolver.setSchema(uid, VILLAGER_ROLE, 3);
-    assert(resolver.allowedSchemas(uid, VILLAGER_ROLE) == IResolver.Action.ATTEST);
+    resolver.setSchema(uid, 3);
+    assert(resolver.allowedSchemas(uid) == IResolver.Action.ATTEST);
     uids[2] = uid;
 
     /// Event Response SCHEMA
     schema = "bool status";
     revocable = true;
     uid = schemaRegistry.register(schema, resolver, revocable);
-    resolver.setSchema(uid, VILLAGER_ROLE, 4);
-    assert(resolver.allowedSchemas(uid, VILLAGER_ROLE) == IResolver.Action.REPLY);
+    resolver.setSchema(uid, 4);
+    assert(resolver.allowedSchemas(uid) == IResolver.Action.REPLY);
     uids[3] = uid;
 
     return uids;
@@ -100,20 +100,20 @@ contract ResolverTest is Test {
     bytes32[] memory uids = test_access_control_add_schemas();
 
     /// MANAGER SCHEMA
-    resolver.setSchema(uids[0], ROOT_ROLE, 0);
-    assert(resolver.allowedSchemas(uids[0], ROOT_ROLE) == IResolver.Action.NONE);
+    resolver.setSchema(uids[0], 0);
+    assert(resolver.allowedSchemas(uids[0]) == IResolver.Action.NONE);
 
     /// VILLAGER SCHEMA
-    resolver.setSchema(uids[1], MANAGER_ROLE, 0);
-    assert(resolver.allowedSchemas(uids[1], MANAGER_ROLE) == IResolver.Action.NONE);
+    resolver.setSchema(uids[1], 0);
+    assert(resolver.allowedSchemas(uids[1]) == IResolver.Action.NONE);
 
     /// Event Attestation SCHEMA
-    resolver.setSchema(uids[2], VILLAGER_ROLE, 0);
-    assert(resolver.allowedSchemas(uids[2], VILLAGER_ROLE) == IResolver.Action.NONE);
+    resolver.setSchema(uids[2], 0);
+    assert(resolver.allowedSchemas(uids[2]) == IResolver.Action.NONE);
 
     /// Event Response SCHEMA
-    resolver.setSchema(uids[3], VILLAGER_ROLE, 0);
-    assert(resolver.allowedSchemas(uids[3], VILLAGER_ROLE) == IResolver.Action.NONE);
+    resolver.setSchema(uids[3], 0);
+    assert(resolver.allowedSchemas(uids[3]) == IResolver.Action.NONE);
   }
 
   function test_access_control_create_roles() public {

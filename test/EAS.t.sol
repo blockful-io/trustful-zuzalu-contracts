@@ -20,6 +20,7 @@ contract ResolverTest is Test {
   address deployer = 0xF977814e90dA44bFA03b6295A0616a897441aceC;
   address manager = 0x96DB2c6D93A8a12089f7a6EdA5464e967308AdEd;
   address villager = 0xe700CCEB04d34b798B5f8b7c35E91231445Ff6C0;
+  address villager2 = 0x0e949072efd935bfba099786af9d32B00AAF000F;
 
   function setUp() public {
     vm.label(deployer, "ROOT");
@@ -38,8 +39,8 @@ contract ResolverTest is Test {
 
     // Check-In Villagers
     vm.startPrank(manager);
-    attest_villager(uids[1], villager, "Check-in");
-    attest_villager(uids[1], manager, "Check-in"); // assigns himself as a villager as well (checkIn)
+    bytes32 attestVillagerUID = attest_villager_checkin(uids[1], villager, "Check-in");
+    attest_villager_checkin(uids[1], manager, "Check-in"); // assigns himself as a villager as well (checkIn)
     assert(IAccessControl(address(resolver)).hasRole(VILLAGER_ROLE, villager));
     assert(IAccessControl(address(resolver)).hasRole(VILLAGER_ROLE, manager));
 
@@ -52,15 +53,26 @@ contract ResolverTest is Test {
     bytes32 responseUID = attest_response(uids[3], villager, eventUID, true);
     attest_response_revoke(uids[3], responseUID);
 
-    // Check-Out Villagers
+    // Check-Out Villager as Himself
     vm.startPrank(villager);
-    attest_villager(uids[1], villager, "Check-out");
+    attest_villager_checkout(uids[1], villager, "Check-out", attestVillagerUID);
     assert(!IAccessControl(address(resolver)).hasRole(VILLAGER_ROLE, villager));
     assert(resolver.checkedOutVillagers(villager));
     // Should fail to check-out again
-    assert(!try_attest_villager(uids[1], villager, "Check-out"));
+    assert(!try_attest_villager_checkout(uids[1], villager, "Check-out", attestVillagerUID));
     // Should fail to check-in again
     assert(!try_attest_villager(uids[1], villager, "Check-in"));
+
+    // Check-Out Villager as Manager
+    vm.startPrank(manager);
+    bytes32 attestVillager2UID = attest_villager_checkin(uids[1], villager2, "Check-in");
+    attest_villager_checkout(uids[1], villager2, "Check-out", attestVillager2UID);
+    assert(!IAccessControl(address(resolver)).hasRole(VILLAGER_ROLE, villager2));
+    assert(resolver.checkedOutVillagers(villager2));
+    // Should fail to check-out again
+    assert(!try_attest_villager_checkout(uids[1], villager2, "Check-out", attestVillager2UID));
+    // Should fail to check-in again
+    assert(!try_attest_villager(uids[1], villager2, "Check-in"));
 
     // Revoke Manager
     vm.startPrank(deployer);
@@ -75,25 +87,25 @@ contract ResolverTest is Test {
     string memory schema = "string role";
     bool revocable = true;
     uids[0] = schemaRegistry.register(schema, resolver, revocable);
-    resolver.setSchema(uids[0], ROOT_ROLE, 1);
+    resolver.setSchema(uids[0], 1);
 
     /// ASSIGN VILLAGER SCHEMA - Action(2)
     schema = "string status";
     revocable = false;
     uids[1] = schemaRegistry.register(schema, resolver, revocable);
-    resolver.setSchema(uids[1], MANAGER_ROLE, 2);
+    resolver.setSchema(uids[1], 2);
 
     /// Event Attestation SCHEMA - Action(3)
     schema = "string title,string comment";
     revocable = false;
     uids[2] = schemaRegistry.register(schema, resolver, revocable);
-    resolver.setSchema(uids[2], VILLAGER_ROLE, 3);
+    resolver.setSchema(uids[2], 3);
 
     /// Event Response SCHEMA - Action(4)
     schema = "bool status";
     revocable = true;
     uids[3] = schemaRegistry.register(schema, resolver, revocable);
-    resolver.setSchema(uids[3], VILLAGER_ROLE, 4);
+    resolver.setSchema(uids[3], 4);
 
     return uids;
   }
@@ -132,7 +144,7 @@ contract ResolverTest is Test {
       );
   }
 
-  function attest_villager(
+  function attest_villager_checkin(
     bytes32 schemaUID,
     address recipient,
     string memory status
@@ -146,6 +158,28 @@ contract ResolverTest is Test {
             expirationTime: 0,
             revocable: false,
             refUID: 0,
+            data: abi.encode(status),
+            value: 0
+          })
+        })
+      );
+  }
+
+  function attest_villager_checkout(
+    bytes32 schemaUID,
+    address recipient,
+    string memory status,
+    bytes32 refUID
+  ) public returns (bytes32) {
+    return
+      eas.attest(
+        AttestationRequest({
+          schema: schemaUID,
+          data: AttestationRequestData({
+            recipient: recipient,
+            expirationTime: 0,
+            revocable: false,
+            refUID: refUID,
             data: abi.encode(status),
             value: 0
           })
@@ -211,6 +245,33 @@ contract ResolverTest is Test {
             expirationTime: 0,
             revocable: false,
             refUID: 0,
+            data: abi.encode(status),
+            value: 0
+          })
+        })
+      )
+    {
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  function try_attest_villager_checkout(
+    bytes32 schemaUID,
+    address recipient,
+    string memory status,
+    bytes32 refUID
+  ) public returns (bool) {
+    try
+      eas.attest(
+        AttestationRequest({
+          schema: schemaUID,
+          data: AttestationRequestData({
+            recipient: recipient,
+            expirationTime: 0,
+            revocable: false,
+            refUID: refUID,
             data: abi.encode(status),
             value: 0
           })
