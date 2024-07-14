@@ -41,6 +41,12 @@ interface IResolver {
   /// @return Whether the attestation can be revoked.
   function revoke(Attestation calldata attestation) external payable returns (bool);
 
+  /// @notice This function will retrieve all titles allowed in the resolver.
+  /// It was designed to aid the frontend in displaying the current badges available.
+  /// NOTE: Only the badges marked as valid will be returned.
+  /// @return An array of all attestation titles.
+  function getAllAttestationTitles() external view returns (string[] memory);
+
   /// @dev Sets the attestation for a given title that will be attested.
   /// When creating attestions, the title must match to the desired configuration saved
   /// on the resolver.

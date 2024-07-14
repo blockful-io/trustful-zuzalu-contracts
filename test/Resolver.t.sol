@@ -27,6 +27,21 @@ contract ResolverTest is Test {
     resolver = new Resolver(eas);
   }
 
+  function test_access_control_all_badge_titles() public {
+    string[] memory registeredTitles = test_access_control_add_attest_title();
+    string[] memory allTitles = resolver.getAllAttestationTitles();
+    assert(allTitles.length == registeredTitles.length);
+    for (uint256 i = 0; i < allTitles.length; i++) {
+      assert(keccak256(abi.encode(allTitles[i])) == keccak256(abi.encode(registeredTitles[i])));
+    }
+    resolver.setAttestationTitle(registeredTitles[0], false);
+    allTitles = resolver.getAllAttestationTitles();
+    assert(allTitles.length == registeredTitles.length - 1);
+    assert(keccak256(abi.encode(allTitles[0])) != keccak256(abi.encode(registeredTitles[0])));
+    assert(keccak256(abi.encode(allTitles[0])) == keccak256(abi.encode(registeredTitles[1])));
+    assert(keccak256(abi.encode(allTitles[1])) == keccak256(abi.encode(registeredTitles[2])));
+  }
+
   function test_access_control_add_attest_title() public returns (string[] memory) {
     string[] memory titles = new string[](3);
     titles[0] = "Changed My Mind";
@@ -144,8 +159,6 @@ contract ResolverTest is Test {
     revokeRole(ROOT_ROLE, deployer);
     assert(!hasRole(ROOT_ROLE, deployer));
   }
-
-  function test_return_all_badge_titles() public {}
 
   function hasRole(bytes32 role, address account) public view returns (bool) {
     return IAccessControl(address(resolver)).hasRole(role, account);

@@ -42,6 +42,9 @@ contract Resolver is IResolver, AccessControl {
   // Maps schemas ID and role ID to action
   mapping(bytes32 => Action) private _allowedSchemas;
 
+  // Maps all attestation titles (badge titles) to be retrieved by the frontend
+  string[] private _attestationTitles;
+
   /// @dev Creates a new resolver.
   /// @param eas The address of the global EAS contract.
   constructor(IEAS eas) {
@@ -230,8 +233,30 @@ contract Resolver is IResolver, AccessControl {
   }
 
   /// @inheritdoc IResolver
+  function getAllAttestationTitles() public view returns (string[] memory) {
+    string[] memory titles = new string[](_attestationTitles.length);
+    uint256 j = 0;
+    for (uint256 i = 0; i < _attestationTitles.length; ) {
+      if (_allowedAttestationTitles[keccak256(abi.encode(_attestationTitles[i]))]) {
+        titles[j] = _attestationTitles[i];
+        assembly {
+          j := add(j, 1)
+        }
+      }
+      assembly {
+        i := add(i, 1)
+      }
+    }
+    assembly {
+      mstore(titles, j)
+    }
+    return titles;
+  }
+
+  /// @inheritdoc IResolver
   function setAttestationTitle(string memory title, bool isValid) public onlyRole(MANAGER_ROLE) {
     _allowedAttestationTitles[keccak256(abi.encode(title))] = isValid;
+    if (isValid) _attestationTitles.push(title);
   }
 
   /// @inheritdoc IResolver
