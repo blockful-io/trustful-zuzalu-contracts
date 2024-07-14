@@ -8,6 +8,7 @@ import { AccessControl } from "@openzeppelin/contracts/access/AccessControl.sol"
 import { AccessDenied, InvalidEAS, InvalidLength, uncheckedInc, EMPTY_UID, NO_EXPIRATION_TIME } from "../Common.sol";
 
 error AlreadyCheckedOut();
+error AlreadyHasResponse();
 error InsufficientValue();
 error InvalidAttestationTitle();
 error InvalidExpiration();
@@ -32,11 +33,14 @@ contract Resolver is IResolver, AccessControl {
   // Maps addresses to booleans to check if a Villager has checked out
   mapping(address => bool) private _checkedOutVillagers;
 
-  // Maps schemas ID and role ID to action
-  mapping(bytes32 => Action) private _allowedSchemas;
-
   // Maps allowed attestations (Hashed titles that can be attested)
   mapping(bytes32 => bool) private _allowedAttestationTitles;
+
+  // Maps attestation IDs to boolans (each attestation can only have one active response)
+  mapping(bytes32 => bool) private _cannotReply;
+
+  // Maps schemas ID and role ID to action
+  mapping(bytes32 => Action) private _allowedSchemas;
 
   /// @dev Creates a new resolver.
   /// @param eas The address of the global EAS contract.
@@ -74,6 +78,11 @@ contract Resolver is IResolver, AccessControl {
   /// @inheritdoc IResolver
   function allowedAttestationTitles(string memory title) public view returns (bool) {
     return _allowedAttestationTitles[keccak256(abi.encode(title))];
+  }
+
+  /// @inheritdoc IResolver
+  function cannotReply(bytes32 uid) public view returns (bool) {
+    return _cannotReply[uid];
   }
 
   /// @inheritdoc IResolver
@@ -126,6 +135,7 @@ contract Resolver is IResolver, AccessControl {
     // Schema to revoke a response ( true / false )
     if (isActionAllowed(attestation.schema, Action.REPLY)) {
       _checkRole(VILLAGER_ROLE, attestation.attester);
+      _cannotReply[attestation.refUID] = false;
       return true;
     }
 
@@ -201,8 +211,9 @@ contract Resolver is IResolver, AccessControl {
   }
 
   /// @dev Attest a response to an event badge emitted by {attestEvent}.
-  function attestResponse(Attestation calldata attestation) internal view returns (bool) {
+  function attestResponse(Attestation calldata attestation) internal returns (bool) {
     if (!attestation.revocable) revert InvalidRevocability();
+    if (_cannotReply[attestation.refUID]) revert AlreadyHasResponse();
     _checkRole(VILLAGER_ROLE, attestation.attester);
 
     // Checks if the attestation has a non empty reference
@@ -211,6 +222,9 @@ contract Resolver is IResolver, AccessControl {
     // Match the attester of this attestation with the recipient of the reference attestation
     // The response is designed to be a reply to a previous attestation
     if (attesterRef.recipient != attestation.attester) revert InvalidRefUID();
+
+    // Cannot create new responses until this attestation is revoked
+    _cannotReply[attestation.refUID] = true;
 
     return true;
   }

@@ -145,6 +145,8 @@ contract ResolverTest is Test {
     assert(!hasRole(ROOT_ROLE, deployer));
   }
 
+  function test_return_all_badge_titles() public {}
+
   function hasRole(bytes32 role, address account) public view returns (bool) {
     return IAccessControl(address(resolver)).hasRole(role, account);
   }

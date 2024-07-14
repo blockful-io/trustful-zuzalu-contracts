@@ -25,6 +25,9 @@ interface IResolver {
   /// @dev Checks if a title is allowed to be attested.
   function allowedAttestationTitles(string memory title) external view returns (bool);
 
+  /// @dev Validates if an attestation can have a response.
+  function cannotReply(bytes32 uid) external view returns (bool);
+
   /// @dev Checks which action a role can perform on a schema.
   function allowedSchemas(bytes32 uid) external view returns (Action);
 

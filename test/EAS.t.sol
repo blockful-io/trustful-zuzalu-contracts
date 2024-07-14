@@ -48,10 +48,18 @@ contract ResolverTest is Test {
     vm.startPrank(villager);
     bytes32 eventUID = attest_event(uids[2], manager, titles[0], "This address changed my mind");
 
-    // Attest Responses, then revoke it
+    // Attest Response
     vm.startPrank(manager);
     bytes32 responseUID = attest_response(uids[3], villager, eventUID, true);
+    assert(resolver.cannotReply(eventUID));
+    // Should fail to attest response again
+    assert(!try_attest_response(uids[3], villager, eventUID, true));
+    // Should be able to revoke the response
     attest_response_revoke(uids[3], responseUID);
+    assert(!resolver.cannotReply(eventUID));
+    // Should be able to re-attest response
+    attest_response(uids[3], villager, eventUID, false);
+    assert(resolver.cannotReply(eventUID));
 
     // Check-Out Villager as Himself
     vm.startPrank(villager);
@@ -271,6 +279,33 @@ contract ResolverTest is Test {
             recipient: recipient,
             expirationTime: 0,
             revocable: false,
+            refUID: refUID,
+            data: abi.encode(status),
+            value: 0
+          })
+        })
+      )
+    {
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  function try_attest_response(
+    bytes32 schemaUID,
+    address recipient,
+    bytes32 refUID,
+    bool status
+  ) public returns (bool) {
+    try
+      eas.attest(
+        AttestationRequest({
+          schema: schemaUID,
+          data: AttestationRequestData({
+            recipient: recipient,
+            expirationTime: 0,
+            revocable: true,
             refUID: refUID,
             data: abi.encode(status),
             value: 0
