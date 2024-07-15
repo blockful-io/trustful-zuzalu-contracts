@@ -86,6 +86,9 @@ contract ResolverTest is Test {
     vm.startPrank(deployer);
     attest_manager_revoke(uids[0], assignedManagerUID);
     assert(!IAccessControl(address(resolver)).hasRole(MANAGER_ROLE, manager));
+
+    // Fail to Revoke Manager a second time
+    assert(!try_attest_manager_revoke(uids[0], assignedManagerUID));
   }
 
   function register_allowed_schemas() public returns (bytes32[] memory) {
@@ -335,5 +338,23 @@ contract ResolverTest is Test {
         data: RevocationRequestData({ uid: attestationUID, value: 0 })
       })
     );
+  }
+
+  function try_attest_manager_revoke(
+    bytes32 schemaUID,
+    bytes32 attestationUID
+  ) public returns (bool) {
+    try
+      eas.revoke(
+        RevocationRequest({
+          schema: schemaUID,
+          data: RevocationRequestData({ uid: attestationUID, value: 0 })
+        })
+      )
+    {
+      return true;
+    } catch {
+      return false;
+    }
   }
 }

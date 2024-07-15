@@ -33,6 +33,9 @@ contract Resolver is IResolver, AccessControl {
   // Maps addresses to booleans to check if a Villager has checked out
   mapping(address => bool) private _checkedOutVillagers;
 
+  // Maps addresses to booleans to check if a Manager has been revoked
+  mapping(address => bool) private _receivedManagerBadge;
+
   // Maps allowed attestations (Hashed titles that can be attested)
   mapping(bytes32 => bool) private _allowedAttestationTitles;
 
@@ -148,12 +151,15 @@ contract Resolver is IResolver, AccessControl {
   /// @dev Assign new managers to the contract.
   function assignManager(Attestation calldata attestation) internal returns (bool) {
     if (hasRole(ROOT_ROLE, attestation.attester) || hasRole(MANAGER_ROLE, attestation.attester)) {
-      if (hasRole(MANAGER_ROLE, attestation.recipient)) revert InvalidRole();
+      if (
+        hasRole(MANAGER_ROLE, attestation.recipient) || _receivedManagerBadge[attestation.recipient]
+      ) revert InvalidRole();
       if (!attestation.revocable) revert InvalidRevocability();
 
       string memory role = abi.decode(attestation.data, (string));
       if (keccak256(abi.encode(role)) != keccak256(abi.encode("Manager"))) revert InvalidRole();
 
+      _receivedManagerBadge[attestation.recipient] = true;
       _grantRole(MANAGER_ROLE, attestation.recipient);
       return true;
     }
