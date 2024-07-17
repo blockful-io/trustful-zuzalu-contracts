@@ -65,22 +65,31 @@ contract ResolverTest is Test {
     vm.startPrank(villager);
     attest_villager_checkout(uids[1], villager, "Check-out", attestVillagerUID);
     assert(!IAccessControl(address(resolver)).hasRole(VILLAGER_ROLE, villager));
-    assert(resolver.checkedOutVillagers(villager));
     // Should fail to check-out again
     assert(!try_attest_villager_checkout(uids[1], villager, "Check-out", attestVillagerUID));
-    // Should fail to check-in again
-    assert(!try_attest_villager(uids[1], villager, "Check-in"));
 
     // Check-Out Villager as Manager
     vm.startPrank(manager);
     bytes32 attestVillager2UID = attest_villager_checkin(uids[1], villager2, "Check-in");
     attest_villager_checkout(uids[1], villager2, "Check-out", attestVillager2UID);
     assert(!IAccessControl(address(resolver)).hasRole(VILLAGER_ROLE, villager2));
-    assert(resolver.checkedOutVillagers(villager2));
     // Should fail to check-out again
     assert(!try_attest_villager_checkout(uids[1], villager2, "Check-out", attestVillager2UID));
-    // Should fail to check-in again
-    assert(!try_attest_villager(uids[1], villager2, "Check-in"));
+
+    // Villager cannot receive event badges after checkout
+    vm.startPrank(manager);
+    assert(!try_attest_event(uids[2], villager2, titles[1], "This address is a good person"));
+
+    // Villager can be checked-in again
+    vm.startPrank(manager);
+    bytes32 attestVillagerUIDSecondTime = attest_villager_checkin(uids[1], villager, "Check-in");
+    // Should have the VILLAGER_ROLE
+    assert(IAccessControl(address(resolver)).hasRole(VILLAGER_ROLE, villager));
+    // Should be able to attest events again
+    vm.startPrank(villager);
+    attest_event(uids[2], manager, titles[2], "This address has a brilliant mind");
+    // Should be able to check-out once more
+    attest_villager_checkout(uids[1], villager, "Check-out", attestVillagerUIDSecondTime);
 
     // Revoke Manager
     vm.startPrank(deployer);
@@ -284,6 +293,33 @@ contract ResolverTest is Test {
             revocable: false,
             refUID: refUID,
             data: abi.encode(status),
+            value: 0
+          })
+        })
+      )
+    {
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  function try_attest_event(
+    bytes32 schemaUID,
+    address recipient,
+    string memory title,
+    string memory comment
+  ) public returns (bool) {
+    try
+      eas.attest(
+        AttestationRequest({
+          schema: schemaUID,
+          data: AttestationRequestData({
+            recipient: recipient,
+            expirationTime: 0,
+            revocable: false,
+            refUID: 0,
+            data: abi.encode(title, comment),
             value: 0
           })
         })

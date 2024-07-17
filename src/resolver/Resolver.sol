@@ -7,7 +7,6 @@ import { IResolver } from "../interfaces/IResolver.sol";
 import { AccessControl } from "@openzeppelin/contracts/access/AccessControl.sol";
 import { AccessDenied, InvalidEAS, InvalidLength, uncheckedInc, EMPTY_UID, NO_EXPIRATION_TIME } from "../Common.sol";
 
-error AlreadyCheckedOut();
 error AlreadyHasResponse();
 error InsufficientValue();
 error InvalidAttestationTitle();
@@ -29,9 +28,6 @@ contract Resolver is IResolver, AccessControl {
   bytes32 public constant ROOT_ROLE = keccak256("ROOT_ROLE");
   bytes32 public constant MANAGER_ROLE = keccak256("MANAGER_ROLE");
   bytes32 public constant VILLAGER_ROLE = keccak256("VILLAGER_ROLE");
-
-  // Maps addresses to booleans to check if a Villager has checked out
-  mapping(address => bool) private _checkedOutVillagers;
 
   // Maps addresses to booleans to check if a Manager has been revoked
   mapping(address => bool) private _receivedManagerBadge;
@@ -74,11 +70,6 @@ contract Resolver is IResolver, AccessControl {
   /// @inheritdoc IResolver
   function isPayable() public pure virtual returns (bool) {
     return false;
-  }
-
-  /// @inheritdoc IResolver
-  function checkedOutVillagers(address villager) public view returns (bool) {
-    return _checkedOutVillagers[villager];
   }
 
   /// @inheritdoc IResolver
@@ -173,10 +164,9 @@ contract Resolver is IResolver, AccessControl {
 
     string memory status = abi.decode(attestation.data, (string));
 
-    // Check if recipient doesn't have Villager Role and it's not checked out (haven't been checked in yet)
+    // Check if recipient doesn't have Villager Role (check-in)
     if (
       !hasRole(VILLAGER_ROLE, attestation.recipient) &&
-      !_checkedOutVillagers[attestation.recipient] &&
       keccak256(abi.encode(status)) == keccak256(abi.encode("Check-in"))
     ) {
       _checkRole(MANAGER_ROLE, attestation.attester);
@@ -184,10 +174,9 @@ contract Resolver is IResolver, AccessControl {
       return true;
     }
 
-    // Check if recipient has Villager Role and it's not checked out (is checked in)
+    // Check if recipient has Villager Role (check-out)
     if (
       hasRole(VILLAGER_ROLE, attestation.recipient) &&
-      !_checkedOutVillagers[attestation.recipient] &&
       keccak256(abi.encode(status)) == keccak256(abi.encode("Check-out")) &&
       (attestation.recipient == attestation.attester || hasRole(MANAGER_ROLE, attestation.attester))
     ) {
@@ -199,7 +188,6 @@ contract Resolver is IResolver, AccessControl {
       if (attesterRef.recipient != attestation.recipient) revert InvalidRefUID();
 
       _revokeRole(VILLAGER_ROLE, attestation.recipient);
-      _checkedOutVillagers[attestation.recipient] = true;
       return true;
     }
 
@@ -210,6 +198,7 @@ contract Resolver is IResolver, AccessControl {
   function attestEvent(Attestation calldata attestation) internal view returns (bool) {
     if (attestation.revocable) revert InvalidRevocability();
     _checkRole(VILLAGER_ROLE, attestation.attester);
+    _checkRole(VILLAGER_ROLE, attestation.recipient);
 
     // Titles for attestations must be included in this contract by the managers
     // via the {setAttestationTitle} function

@@ -19,9 +19,6 @@ interface IResolver {
   /// @return Whether the resolver supports ETH transfers.
   function isPayable() external pure returns (bool);
 
-  /// @dev Checks if a villager is checkedOut.
-  function checkedOutVillagers(address villager) external view returns (bool);
-
   /// @dev Checks if a title is allowed to be attested.
   function allowedAttestationTitles(string memory title) external view returns (bool);
 
