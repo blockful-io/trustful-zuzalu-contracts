@@ -7,7 +7,7 @@ import { IResolver } from "../interfaces/IResolver.sol";
 import { AccessControl } from "@openzeppelin/contracts/access/AccessControl.sol";
 import { AccessDenied, InvalidEAS, InvalidLength, uncheckedInc, EMPTY_UID, NO_EXPIRATION_TIME } from "../Common.sol";
 
-error AlreadyCheckedOut();
+error AlreadyHasResponse();
 error InsufficientValue();
 error InvalidAttestationTitle();
 error InvalidExpiration();
@@ -29,14 +29,20 @@ contract Resolver is IResolver, AccessControl {
   bytes32 public constant MANAGER_ROLE = keccak256("MANAGER_ROLE");
   bytes32 public constant VILLAGER_ROLE = keccak256("VILLAGER_ROLE");
 
-  // Maps addresses to booleans to check if a Villager has checked out
-  mapping(address => bool) private _checkedOutVillagers;
+  // Maps addresses to booleans to check if a Manager has been revoked
+  mapping(address => bool) private _receivedManagerBadge;
+
+  // Maps allowed attestations (Hashed titles that can be attested)
+  mapping(bytes32 => bool) private _allowedAttestationTitles;
+
+  // Maps attestation IDs to boolans (each attestation can only have one active response)
+  mapping(bytes32 => bool) private _cannotReply;
 
   // Maps schemas ID and role ID to action
   mapping(bytes32 => Action) private _allowedSchemas;
 
-  // Maps allowed attestations (Hashed titles that can be attested)
-  mapping(bytes32 => bool) private _allowedAttestationTitles;
+  // Maps all attestation titles (badge titles) to be retrieved by the frontend
+  string[] private _attestationTitles;
 
   /// @dev Creates a new resolver.
   /// @param eas The address of the global EAS contract.
@@ -67,13 +73,13 @@ contract Resolver is IResolver, AccessControl {
   }
 
   /// @inheritdoc IResolver
-  function checkedOutVillagers(address villager) public view returns (bool) {
-    return _checkedOutVillagers[villager];
+  function allowedAttestationTitles(string memory title) public view returns (bool) {
+    return _allowedAttestationTitles[keccak256(abi.encode(title))];
   }
 
   /// @inheritdoc IResolver
-  function allowedAttestationTitles(string memory title) public view returns (bool) {
-    return _allowedAttestationTitles[keccak256(abi.encode(title))];
+  function cannotReply(bytes32 uid) public view returns (bool) {
+    return _cannotReply[uid];
   }
 
   /// @inheritdoc IResolver
@@ -126,6 +132,7 @@ contract Resolver is IResolver, AccessControl {
     // Schema to revoke a response ( true / false )
     if (isActionAllowed(attestation.schema, Action.REPLY)) {
       _checkRole(VILLAGER_ROLE, attestation.attester);
+      _cannotReply[attestation.refUID] = false;
       return true;
     }
 
@@ -135,12 +142,15 @@ contract Resolver is IResolver, AccessControl {
   /// @dev Assign new managers to the contract.
   function assignManager(Attestation calldata attestation) internal returns (bool) {
     if (hasRole(ROOT_ROLE, attestation.attester) || hasRole(MANAGER_ROLE, attestation.attester)) {
-      if (hasRole(MANAGER_ROLE, attestation.recipient)) revert InvalidRole();
+      if (
+        hasRole(MANAGER_ROLE, attestation.recipient) || _receivedManagerBadge[attestation.recipient]
+      ) revert InvalidRole();
       if (!attestation.revocable) revert InvalidRevocability();
 
       string memory role = abi.decode(attestation.data, (string));
       if (keccak256(abi.encode(role)) != keccak256(abi.encode("Manager"))) revert InvalidRole();
 
+      _receivedManagerBadge[attestation.recipient] = true;
       _grantRole(MANAGER_ROLE, attestation.recipient);
       return true;
     }
@@ -154,10 +164,9 @@ contract Resolver is IResolver, AccessControl {
 
     string memory status = abi.decode(attestation.data, (string));
 
-    // Check if recipient doesn't have Villager Role and it's not checked out (haven't been checked in yet)
+    // Check if recipient doesn't have Villager Role (check-in)
     if (
       !hasRole(VILLAGER_ROLE, attestation.recipient) &&
-      !_checkedOutVillagers[attestation.recipient] &&
       keccak256(abi.encode(status)) == keccak256(abi.encode("Check-in"))
     ) {
       _checkRole(MANAGER_ROLE, attestation.attester);
@@ -165,10 +174,9 @@ contract Resolver is IResolver, AccessControl {
       return true;
     }
 
-    // Check if recipient has Villager Role and it's not checked out (is checked in)
+    // Check if recipient has Villager Role (check-out)
     if (
       hasRole(VILLAGER_ROLE, attestation.recipient) &&
-      !_checkedOutVillagers[attestation.recipient] &&
       keccak256(abi.encode(status)) == keccak256(abi.encode("Check-out")) &&
       (attestation.recipient == attestation.attester || hasRole(MANAGER_ROLE, attestation.attester))
     ) {
@@ -180,7 +188,6 @@ contract Resolver is IResolver, AccessControl {
       if (attesterRef.recipient != attestation.recipient) revert InvalidRefUID();
 
       _revokeRole(VILLAGER_ROLE, attestation.recipient);
-      _checkedOutVillagers[attestation.recipient] = true;
       return true;
     }
 
@@ -191,6 +198,7 @@ contract Resolver is IResolver, AccessControl {
   function attestEvent(Attestation calldata attestation) internal view returns (bool) {
     if (attestation.revocable) revert InvalidRevocability();
     _checkRole(VILLAGER_ROLE, attestation.attester);
+    _checkRole(VILLAGER_ROLE, attestation.recipient);
 
     // Titles for attestations must be included in this contract by the managers
     // via the {setAttestationTitle} function
@@ -201,8 +209,9 @@ contract Resolver is IResolver, AccessControl {
   }
 
   /// @dev Attest a response to an event badge emitted by {attestEvent}.
-  function attestResponse(Attestation calldata attestation) internal view returns (bool) {
+  function attestResponse(Attestation calldata attestation) internal returns (bool) {
     if (!attestation.revocable) revert InvalidRevocability();
+    if (_cannotReply[attestation.refUID]) revert AlreadyHasResponse();
     _checkRole(VILLAGER_ROLE, attestation.attester);
 
     // Checks if the attestation has a non empty reference
@@ -212,12 +221,37 @@ contract Resolver is IResolver, AccessControl {
     // The response is designed to be a reply to a previous attestation
     if (attesterRef.recipient != attestation.attester) revert InvalidRefUID();
 
+    // Cannot create new responses until this attestation is revoked
+    _cannotReply[attestation.refUID] = true;
+
     return true;
+  }
+
+  /// @inheritdoc IResolver
+  function getAllAttestationTitles() public view returns (string[] memory) {
+    string[] memory titles = new string[](_attestationTitles.length);
+    uint256 j = 0;
+    for (uint256 i = 0; i < _attestationTitles.length; ) {
+      if (_allowedAttestationTitles[keccak256(abi.encode(_attestationTitles[i]))]) {
+        titles[j] = _attestationTitles[i];
+        assembly {
+          j := add(j, 1)
+        }
+      }
+      assembly {
+        i := add(i, 1)
+      }
+    }
+    assembly {
+      mstore(titles, j)
+    }
+    return titles;
   }
 
   /// @inheritdoc IResolver
   function setAttestationTitle(string memory title, bool isValid) public onlyRole(MANAGER_ROLE) {
     _allowedAttestationTitles[keccak256(abi.encode(title))] = isValid;
+    if (isValid) _attestationTitles.push(title);
   }
 
   /// @inheritdoc IResolver

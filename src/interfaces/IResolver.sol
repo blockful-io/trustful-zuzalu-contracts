@@ -19,11 +19,11 @@ interface IResolver {
   /// @return Whether the resolver supports ETH transfers.
   function isPayable() external pure returns (bool);
 
-  /// @dev Checks if a villager is checkedOut.
-  function checkedOutVillagers(address villager) external view returns (bool);
-
   /// @dev Checks if a title is allowed to be attested.
   function allowedAttestationTitles(string memory title) external view returns (bool);
+
+  /// @dev Validates if an attestation can have a response.
+  function cannotReply(bytes32 uid) external view returns (bool);
 
   /// @dev Checks which action a role can perform on a schema.
   function allowedSchemas(bytes32 uid) external view returns (Action);
@@ -37,6 +37,12 @@ interface IResolver {
   /// @param attestation The existing attestation to be revoked.
   /// @return Whether the attestation can be revoked.
   function revoke(Attestation calldata attestation) external payable returns (bool);
+
+  /// @notice This function will retrieve all titles allowed in the resolver.
+  /// It was designed to aid the frontend in displaying the current badges available.
+  /// NOTE: Only the badges marked as valid will be returned.
+  /// @return An array of all attestation titles.
+  function getAllAttestationTitles() external view returns (string[] memory);
 
   /// @dev Sets the attestation for a given title that will be attested.
   /// When creating attestions, the title must match to the desired configuration saved
