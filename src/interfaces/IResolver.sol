@@ -56,5 +56,10 @@ interface IResolver {
   /// determines the data that will fill the schema data.
   /// @param uid The UID of the schema.
   /// @param action The action that the role can perform on the schema.
-  function setSchema(bytes32 uid, uint256 action) external;
+  function setSchema(bytes32 uid, Action action) external;
+
+  /// @dev Retrieves all schemas that can perform a given action.
+  /// @param action The action to retrieve schemas for.
+  /// @return An array of schema UIDs that can perform the given action.
+  function getAllSchemas(Action action) external view returns (bytes32[] memory);
 }

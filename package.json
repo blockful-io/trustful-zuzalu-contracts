@@ -26,8 +26,8 @@
   "scripts": {
     "clean": "rm -rf cache out",
     "build": "forge build",
-    "deploy": "forge create Resolver --rpc-url $RPC_OP --private-key $PRIVATE_KEY --constructor-args 0x4200000000000000000000000000000000000021",
-    "verify": "forge verify-contract $ADDRESS_RESOLVER --rpc-url $RPC_OP --etherscan-api-key $API_KEY_OPTIMISTIC_ETHERSCAN --constructor-args $(cast abi-encode 'constructor(address)' 0x4200000000000000000000000000000000000021 )",
+    "deploy:factory": "forge create ResolverFactory --broadcast --rpc-url $RPC_OP --private-key $PRIVATE_KEY",
+    "verify:factory": "forge verify-contract $ADDRESS_FACTORY --verifier-url $VERIFIER_URL --rpc-url $RPC_OP --etherscan-api-key $ETHERSCAN_API_KEY --constructor-args $(cast abi-encode 'constructor()')",
     "lint": "bun run lint:sol && bun run prettier:check",
     "lint:sol": "forge fmt --check && bun solhint {script,src,test}/**/*.sol",
     "prettier:check": "prettier --check \"**/*.{json,md,yml}\" --ignore-path \".prettierignore\"",

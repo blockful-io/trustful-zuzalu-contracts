@@ -33,3 +33,5 @@ wrap_comments = true
 
 [rpc_endpoints]
 opsepolia = "https://opt-sepolia.g.alchemy.com/v2/x8XmzaLb--I_ip4h88iC-9B7d6DgLzDU"
+blessnet = "https://blessnet.caldera.rpc.caldera.xyz/http"
+blessnetSepolia = "https://blessnet-sepolia-testnet.rpc.caldera.xyz/http"

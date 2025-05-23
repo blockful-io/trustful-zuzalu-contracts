@@ -12,6 +12,7 @@ error AccessDenied();
 error DeadlineExpired();
 error InvalidEAS();
 error InvalidLength();
+error InvalidSchemaRegistry();
 error InvalidSignature();
 error NotFound();
 
