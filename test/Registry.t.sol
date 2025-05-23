@@ -14,44 +14,15 @@ contract RegistryTest is Test {
 
   function setUp() public {
     vm.startPrank(0xF977814e90dA44bFA03b6295A0616a897441aceC);
-    resolver = new Resolver(eas);
+    resolver = new Resolver(eas, schemaRegistry, new address[](0));
   }
 
   function test_registry_manager() public {
-    string memory schema = "string role";
+    string memory schema = "string role,bool wtf";
     bool revocable = true;
 
     bytes32 uid = schemaRegistry.register(schema, resolver, revocable);
     console2.log("Schema UID generated Manager:");
-    console2.logBytes32(uid);
-  }
-
-  function test_registry_villager() public {
-    string memory schema = "string status";
-    bool revocable = false;
-
-    bytes32 uid = schemaRegistry.register(schema, resolver, revocable);
-    console2.log("Schema UID generated Villager:");
-    console2.logBytes32(uid);
-  }
-
-  function test_registry_attest() public {
-    string memory schema = "string title,string comment";
-    bool revocable = false;
-
-    bytes32 uid = schemaRegistry.register(schema, resolver, revocable);
-
-    console2.log("Schema UID generated attest:");
-    console2.logBytes32(uid);
-  }
-
-  function test_registry_response_attest() public {
-    string memory schema = "bool status";
-    bool revocable = true;
-
-    bytes32 uid = schemaRegistry.register(schema, resolver, revocable);
-
-    console2.log("Schema UID generated Response attest:");
     console2.logBytes32(uid);
   }
 }

@@ -6,6 +6,7 @@ import { IEAS, Attestation } from "../interfaces/IEAS.sol";
 import { IResolver } from "../interfaces/IResolver.sol";
 import { AccessControl } from "@openzeppelin/contracts/access/AccessControl.sol";
 import { AccessDenied, InvalidEAS, InvalidLength, uncheckedInc, EMPTY_UID, NO_EXPIRATION_TIME } from "../Common.sol";
+import { ISchemaRegistry } from "../interfaces/ISchemaRegistry.sol";
 
 error AlreadyHasResponse();
 error InsufficientValue();
@@ -17,6 +18,8 @@ error InvalidRole();
 error InvalidWithdraw();
 error NotPayable();
 error Unauthorized();
+
+import { console } from "forge-std/src/console.sol";
 
 /// @author Blockful | 0xneves
 /// @notice ZuVillage Resolver contract for Ethereum Attestation Service.
@@ -41,12 +44,15 @@ contract Resolver is IResolver, AccessControl {
   // Maps schemas ID and role ID to action
   mapping(bytes32 => Action) private _allowedSchemas;
 
+  // Maps actions to schemas ID
+  mapping(Action => bytes32[]) private _actionUids;
+
   // Maps all attestation titles (badge titles) to be retrieved by the frontend
   string[] private _attestationTitles;
 
   /// @dev Creates a new resolver.
   /// @param eas The address of the global EAS contract.
-  constructor(IEAS eas) {
+  constructor(IEAS eas, ISchemaRegistry schemaRegistry, address[] memory managers) {
     if (address(eas) == address(0)) revert InvalidEAS();
     _eas = eas;
 
@@ -59,6 +65,16 @@ contract Resolver is IResolver, AccessControl {
     _grantRole(ROOT_ROLE, msg.sender);
     _grantRole(MANAGER_ROLE, msg.sender);
     _grantRole(VILLAGER_ROLE, msg.sender);
+
+    for (uint256 i = 0; i < managers.length; i++) {
+      _grantRole(MANAGER_ROLE, managers[i]);
+    }
+
+    IResolver myself = IResolver(address(this));
+    setSchema(schemaRegistry.register("string role", myself, true), Action.ASSIGN_MANAGER);
+    setSchema(schemaRegistry.register("string status", myself, false), Action.ASSIGN_VILLAGER);
+    setSchema(schemaRegistry.register("string title,string comment", myself, false), Action.ATTEST);
+    setSchema(schemaRegistry.register("bool status", myself, true), Action.REPLY);
   }
 
   /// @dev Ensures that only the EAS contract can make this call.
@@ -255,8 +271,30 @@ contract Resolver is IResolver, AccessControl {
   }
 
   /// @inheritdoc IResolver
-  function setSchema(bytes32 uid, uint256 action) public onlyRole(ROOT_ROLE) {
+  function setSchema(bytes32 uid, Action action) public onlyRole(ROOT_ROLE) {
     _allowedSchemas[uid] = Action(action);
+    _actionUids[action].push(uid);
+  }
+
+  /// @inheritdoc IResolver
+  function getAllSchemas(Action action) public view returns (bytes32[] memory) {
+    bytes32[] memory uids = new bytes32[](_actionUids[action].length);
+    uint256 j = 0;
+    for (uint256 i = 0; i < _actionUids[action].length; ) {
+      if (_allowedSchemas[_actionUids[action][i]] == action) {
+        uids[j] = _actionUids[action][i];
+        assembly {
+          j := add(j, 1)
+        }
+      }
+      assembly {
+        i := add(i, 1)
+      }
+    }
+    assembly {
+      mstore(uids, j)
+    }
+    return uids;
   }
 
   /// @dev ETH callback.

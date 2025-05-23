@@ -27,11 +27,16 @@ contract ResolverTest is Test {
     vm.label(manager, "MANAGER");
     vm.label(villager, "VILLAGER");
     vm.startPrank(deployer);
-    resolver = new Resolver(eas);
+    resolver = new Resolver(eas, schemaRegistry, new address[](0));
   }
 
+
   function test_attestations() public {
-    bytes32[] memory uids = register_allowed_schemas();
+    bytes32[] memory uids = new bytes32[](4);
+    uids[0] = resolver.getAllSchemas(IResolver.Action.ASSIGN_MANAGER)[0];
+    uids[1] = resolver.getAllSchemas(IResolver.Action.ASSIGN_VILLAGER)[0];
+    uids[2] = resolver.getAllSchemas(IResolver.Action.ATTEST)[0];
+    uids[3] = resolver.getAllSchemas(IResolver.Action.REPLY)[0];
     string[] memory titles = register_allowed_titles();
 
     // Assign manager
@@ -100,35 +105,6 @@ contract ResolverTest is Test {
     assert(!try_attest_manager_revoke(uids[0], assignedManagerUID));
   }
 
-  function register_allowed_schemas() public returns (bytes32[] memory) {
-    bytes32[] memory uids = new bytes32[](4);
-
-    /// ASSIGN MANAGER SCHEMA - Action(1)
-    string memory schema = "string role";
-    bool revocable = true;
-    uids[0] = schemaRegistry.register(schema, resolver, revocable);
-    resolver.setSchema(uids[0], 1);
-
-    /// ASSIGN VILLAGER SCHEMA - Action(2)
-    schema = "string status";
-    revocable = false;
-    uids[1] = schemaRegistry.register(schema, resolver, revocable);
-    resolver.setSchema(uids[1], 2);
-
-    /// Event Attestation SCHEMA - Action(3)
-    schema = "string title,string comment";
-    revocable = false;
-    uids[2] = schemaRegistry.register(schema, resolver, revocable);
-    resolver.setSchema(uids[2], 3);
-
-    /// Event Response SCHEMA - Action(4)
-    schema = "bool status";
-    revocable = true;
-    uids[3] = schemaRegistry.register(schema, resolver, revocable);
-    resolver.setSchema(uids[3], 4);
-
-    return uids;
-  }
 
   function register_allowed_titles() public returns (string[] memory) {
     string[] memory titles = new string[](3);
